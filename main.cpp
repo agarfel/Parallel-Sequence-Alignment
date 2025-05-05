@@ -20,14 +20,24 @@ public:
 
     CoupleSequences(){}
 
-    void load_sequences(const str file1, const str file2){
+    CoupleSequences(const str file1, const str file2){
+        load_sequences(file1, file2);
+    }
 
-        this->seq1 = readFastaSequence(file1);
-        this->seq2 = readFastaSequence(file2);
+    //load sequences from file
+    void load_sequences(const str file1, const str file2){
+        input_sequences(readFastaSequence(file1), readFastaSequence(file2));
+    }
+
+    //input sequences as strings directly 
+    void input_sequences(str seq1, str seq2){
+        this->seq1 = seq1;
+        this->seq2 = seq2;
         n = seq1.length();
         m = seq2.length();
     }
 
+    //score function for the DP matrix creation
     int score(int i, int j){
         if(i >= n || j >= m){
             std::cout << "out of range" << std::endl;
@@ -37,6 +47,9 @@ public:
        return (seq1[i] == seq2[j]) ? match : mismatch;
     }
 
+    void print(){
+        std::cout << "\nObject Couple of Sequences (" << n << ", " << m << ") \n\n" << "seq1 : " << seq1 << "\n\n" << "seq2 : " << seq2 << "\n" << std::endl;
+    }
 };
 
 class Matrix {
@@ -52,7 +65,7 @@ public:
         this->m = m;
 
         data = new int*[n];
-        for(int i = 0; i<m; i++){
+        for(int i = 0; i<n; i++){
             data[i] = new int[m];
         }
     }
@@ -70,28 +83,77 @@ public:
 
 // Needleman-Wunsh (NW)
 
-void construct_NW(CoupleSequences& Seq, Matrix* H){
+int construct_NW(CoupleSequences& Seq, Matrix& H){
     // n rows, m columns
-    int n = H->n;
-    int m = H->m;
+    int n = H.n;
+    int m = H.m;
 
     //initialize first row and first column
     for(int j = 0; j < m; j++){
-        (*H)[0][j] = j * gap;
+        H[0][j] = j * gap;
     }
     for(int i = 0; i < n; i++){
-        (*H)[i][0] = i * gap;
+        H[i][0] = i * gap;
     }
 
     //recurrence relation
     for(int i = 1; i < n; i++){
         for(int j = 1; j < m; j++){
-            (*H)[i][j] = std::max({((*H)[i-1][j-1] + Seq.score(i,j)), (*H)[i][j-1] + gap, (*H)[i-1][j] + gap});
+            H[i][j] = std::max({(H[i-1][j-1] + Seq.score(i,j)), H[i][j-1] + gap, H[i-1][j] + gap});
+        }
+    }
+    return H[n-1][m-1];
+}
+
+CoupleSequences trace_back(CoupleSequences& Seq, Matrix& H){
+
+    str seq1 = "";
+    str seq2 = "";
+    int i = H.n - 1;
+    int j = H.m - 1;
+
+    while(i > 0 && j > 0){
+        int score = H[i][j];
+
+        //comes from top -> gap from seq2
+        if(score - gap == H[i-1][j]){
+            seq1 = Seq.seq1[i] + seq1;
+            seq2 = "-" + seq2;
+            i--;
+        }
+        //comes from left -> gap from seq1
+        else if (score - gap == H[i][j-1]){
+            seq1 = "-" + seq1;
+            seq2 = Seq.seq2[j] + seq2;
+            j--;
+        }
+        //comes from diagonal -> match/mismatch
+        else{
+            seq1 = Seq.seq1[i-1] + seq1;
+            seq2 = Seq.seq2[j-1] + seq2;
+            i--;
+            j--;
         }
     }
 
-}
+    //leftovers from seq1
+    while(i >= 0){
+        seq1 = Seq.seq1[i] + seq1;
+        seq2 = "-" + seq2;
+        i--;
+    }
 
+    //leftovers from seq2
+    while(j >= 0){
+        seq1 = "-" + seq1;
+        seq2 = Seq.seq2[j] + seq2;
+        j--;
+    }
+
+    CoupleSequences Alignement;
+    Alignement.input_sequences(seq1, seq2);
+    return Alignement;
+}
 // Gotoh
 
 void construct_Gotoh(int** DP){
@@ -105,8 +167,16 @@ void construct_Gotoh(int** DP){
 int main(){
 
     CoupleSequences Seq;
-    Seq.load_sequences("sequences/Q9CD83.fasta", "sequences/Q9CD83.fasta");
+    str file1 = "sequences/insulin_homo.fasta";
+    str file2 = "sequences/insulin_bovin.fasta";
+    Seq.load_sequences(file1, file2);
     Matrix* H = new Matrix(Seq.n, Seq.m);
-    construct_NW(Seq, H);
+
+    int score = construct_NW(Seq, *H);
+    std::cout << "score : " << score << std::endl;
+    CoupleSequences alignement;
+    alignement = trace_back(Seq, *H);
+    alignement.print();
+
     return 0;
 }
