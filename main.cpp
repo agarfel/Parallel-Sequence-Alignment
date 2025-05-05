@@ -4,13 +4,15 @@
 
 #include "read_fasta.cpp"
 
-//---------- Preliminary -------------------------
+//---------- Preliminary -----------------------------------
 
 typedef std::string str;
 
 int match = 1;
 int mismatch = -1;
 int gap = -2;
+int gap_op = -4;
+int eps = -1e9;
 
 class CoupleSequences {
 public:
@@ -79,7 +81,7 @@ public:
     }
 };  
 
-//---------- constructing the DP matrix ----------
+//---------- constructing the DP matrix and traceback ------
 
 // Needleman-Wunsh (NW)
 
@@ -105,7 +107,7 @@ int construct_NW(CoupleSequences& Seq, Matrix& H){
     return H[n-1][m-1];
 }
 
-CoupleSequences trace_back(CoupleSequences& Seq, Matrix& H){
+CoupleSequences trace_back_NW(CoupleSequences& Seq, Matrix& H){
 
     str seq1 = "";
     str seq2 = "";
@@ -156,26 +158,119 @@ CoupleSequences trace_back(CoupleSequences& Seq, Matrix& H){
 }
 // Gotoh
 
-void construct_Gotoh(int** DP){
+int construct_Gotoh(CoupleSequences& Seq, Matrix& H, Matrix& E, Matrix& F){
+    // n rows, m columns
+    int n = H.n;
+    int m = H.m;
 
-    
+    //initialize first row and first column
+    for(int j = 0; j < m; j++){
+        H[0][j] = gap_op + (j-1)*gap;
+        F[0][j] = gap_op + (j-1)*gap;
+        E[0][j] = eps;
+    }
+    for(int i = 0; i < n; i++){
+        H[i][0] = gap_op + (i-1)*gap;
+        E[i][0] = gap_op + (i-1)*gap;
+        F[i][0] = eps;
+    }
+
+    //recurrence relation
+    for(int i = 1; i < n; i++){
+        for(int j = 1; j < m; j++){
+            E[i][j] = std::max({(E[i][j-1] + gap), (H[i][j-1] + gap_op)});
+            F[i][j] = std::max({(F[i-1][j] + gap), (H[i-1][j] + gap_op)});
+            H[i][j] = std::max({0, E[i][j], F[i][j], (H[i-1][j-1] + Seq.score(i, j)) });
+        }
+    }
+    return H[n-1][m-1];
 
 }
 
-//---------- other stuff -------------------------
+CoupleSequences trace_back_Gotoh(CoupleSequences& Seq, Matrix& H, Matrix& E, Matrix& F){
 
-int main(){
+    str seq1 = "";
+    str seq2 = "";
+    int i = H.n - 1;
+    int j = H.m - 1;
+
+    while(i > 0 && j > 0){
+        int score = H[i][j];
+
+        //comes from top -> gap from seq2
+        if(score == E[i-1][j] + gap_op){
+            seq1 = Seq.seq1[i] + seq1;
+            seq2 = "-" + seq2;
+            i--;
+        }
+        //comes from left -> gap from seq1
+        else if (score == F[i][j-1] + gap_op){
+            seq1 = "-" + seq1;
+            seq2 = Seq.seq2[j] + seq2;
+            j--;
+        }
+        //comes from diagonal -> match/mismatch
+        else{
+            seq1 = Seq.seq1[i-1] + seq1;
+            seq2 = Seq.seq2[j-1] + seq2;
+            i--;
+            j--;
+        }
+    }
+
+    //leftovers from seq1
+    while(i >= 0){
+        seq1 = Seq.seq1[i] + seq1;
+        seq2 = "-" + seq2;
+        i--;
+    }
+
+    //leftovers from seq2
+    while(j >= 0){
+        seq1 = "-" + seq1;
+        seq2 = Seq.seq2[j] + seq2;
+        j--;
+    }
+
+    CoupleSequences Alignement;
+    Alignement.input_sequences(seq1, seq2);
+    return Alignement;
+}
+
+//---------- other stuff -----------------------------------
+
+// if "G" is entered the Gotoh algorithm is used, otherwise by default the NW is used
+
+int main(int argc, char* argv[]){
+    
+    bool flag = true;
+    if(argc >= 2){
+        if(str(argv[1]) == "G"){
+            flag = false;
+        }
+    }
 
     CoupleSequences Seq;
     str file1 = "sequences/insulin_homo.fasta";
     str file2 = "sequences/insulin_bovin.fasta";
     Seq.load_sequences(file1, file2);
-    Matrix* H = new Matrix(Seq.n, Seq.m);
-
-    int score = construct_NW(Seq, *H);
-    std::cout << "score : " << score << std::endl;
     CoupleSequences alignement;
-    alignement = trace_back(Seq, *H);
+    int score = 0;
+
+    if(flag){
+        Matrix* H = new Matrix(Seq.n, Seq.m);
+        score = construct_NW(Seq, *H);
+        alignement = trace_back_NW(Seq, *H);
+    }
+    else{   
+        Matrix* H = new Matrix(Seq.n, Seq.m);
+        Matrix* E = new Matrix(Seq.n, Seq.m);
+        Matrix* F = new Matrix(Seq.n, Seq.m);
+        score = construct_Gotoh(Seq, *H, *E, *F);
+        alignement = trace_back_Gotoh(Seq, *H, *E, *F);
+    }
+
+    std::cout << "score : " << score << std::endl;
     alignement.print();
 
     return 0;
