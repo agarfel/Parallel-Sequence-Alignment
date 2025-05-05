@@ -2,6 +2,8 @@
 #include <fstream>
 #include <iostream>
 
+// the files used to store the sequences are of format .fasta
+// this function allows us to get a string version of these files 
 
 std::string readFastaSequence(const std::string& filename) {
     std::ifstream file(filename);
