@@ -1,6 +1,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <vector>
 
 #include "read_fasta.cpp"
 
@@ -10,7 +11,7 @@ typedef std::string str;
 
 int match = 1;
 int mismatch = -1;
-int gap = -2;
+int gap = -1;
 int gap_op = -4;
 int eps = -1e9;
 
@@ -180,7 +181,7 @@ int construct_Gotoh(CoupleSequences& Seq, Matrix& H, Matrix& E, Matrix& F){
         for(int j = 1; j < m; j++){
             E[i][j] = std::max({(E[i][j-1] + gap), (H[i][j-1] + gap_op)});
             F[i][j] = std::max({(F[i-1][j] + gap), (H[i-1][j] + gap_op)});
-            H[i][j] = std::max({0, E[i][j], F[i][j], (H[i-1][j-1] + Seq.score(i, j)) });
+            H[i][j] = std::max({E[i][j], F[i][j], (H[i-1][j-1] + Seq.score(i, j))}); // 0 in the set ?
         }
     }
     return H[n-1][m-1];
@@ -193,29 +194,64 @@ CoupleSequences trace_back_Gotoh(CoupleSequences& Seq, Matrix& H, Matrix& E, Mat
     str seq2 = "";
     int i = H.n - 1;
     int j = H.m - 1;
+    int curr = 0;
 
     while(i > 0 && j > 0){
-        int score = H[i][j];
-
-        //comes from top -> gap from seq2
-        if(score == E[i-1][j] + gap_op){
-            seq1 = Seq.seq1[i] + seq1;
-            seq2 = "-" + seq2;
-            i--;
-        }
-        //comes from left -> gap from seq1
-        else if (score == F[i][j-1] + gap_op){
-            seq1 = "-" + seq1;
-            seq2 = Seq.seq2[j] + seq2;
-            j--;
-        }
-        //comes from diagonal -> match/mismatch
-        else{
+        int score;
+        
+        // In H
+        if(curr == 0){
+            score = H[i][j];
             seq1 = Seq.seq1[i-1] + seq1;
             seq2 = Seq.seq2[j-1] + seq2;
+
+            //comes from E
+            if(score == E[i][j]){
+                curr = 1;
+            }
+            //comes from F
+            else if (score == F[i][j]){
+                curr = 2;
+            }
+            //comes from H doesnt change curr
+
             i--;
             j--;
+            continue;
         }
+
+        // In E
+        if(curr == 1){
+            score = E[i][j];
+            seq1 = "-" + seq1;
+            seq2 = Seq.seq2[j-1] + seq2;
+
+            //comes from H
+            if(score - gap_op == H[i][j-1]){
+               curr = 0;
+            }
+            //comes from E doesnt change curr
+
+            j--;
+            continue;
+        }
+        
+        // In F
+        if(curr == 2){
+            score = F[i][j];
+            seq1 = Seq.seq1[i-1] + seq1;
+            seq2 = "-" + seq2;
+
+            //comes from H
+            if (score - gap_op == H[i-1][j]){
+                curr = 0;
+            }
+            //comes from F doesnt change curr
+
+            i--;
+            continue;
+        }
+        
     }
 
     //leftovers from seq1
