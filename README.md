@@ -9,7 +9,7 @@ Interesting links:
 
 Deadlines:
   - 4th May: Read paper and choose algorithm (Unofficial)
-  - 15th May: Initial report (Official)
+  - 21th May: Initial report (Official)
   - 25th May: Finish Code (Official)
   - 1st June: Finish Report (Unofficial) (Deadline to submit project for review)
   - 7th June: Project Deadline (Official)
