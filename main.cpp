@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "sequential.cpp"
+#include "alg.cpp"
 
 //---------- other stuff -----------------------------------
 
