@@ -83,4 +83,29 @@ Where $T_{max} = max(T_1[i,j], T_2[i,j], T3[i,j])$ (same for $T^R_{max'}$). A so
 #### Alg
 We assume we are given p processors, with the sequences A' and B' distributed such that $P_k$ is given $b_{k\frac{n}{p} +1},...,b_{(k+1)\frac{n}{p}}$ and $a_{k\frac{m}{p} +1},...,a_{(k+1)\frac{m}{p}}$.
 
+During decomposition phase, $P_k$ is responsible for columns $k\frac{n}{p} + 1, ..., (k+1)\frac{n}{p}$. We define special columns of the dynamic programming table to be the columns $0, \frac{m}{p}, 2\frac{m}{p},...,m$. To decompose the problem we locate intersections an optimal solution makes with the special rows and special columns.
+
+
+*Determine intersecions optimal solution with special row i*:
+- Compute opt(i,j) for each cell in the row.
+- optimal alignment passes through [i,j] iff opt(i,j) = $max_{0\leq l \leq n}$(opt(i,l)).
+- Take the leftmost such cell as the intersection cell ri for row i.
+
+Same technique works for subproblems but we only check opt(i,j) for $j'-1 \leq j \leq j''$
+
+[Missing?]
+
+*Decomposition phase*:
+Initially: all processors allocated to a single subproblem, entire dynamic programming table, with start type of -1 and end type of -1.
+
+At each step: decomposing some subproblem (A, B, s, e)
+  - If rows $k\frac{m}{p}, (k+1)\frac{m}{p}, ..., k'\frac{m}{p}$ are the special rows going through the region, then set $i = [\frac{k +k'}{2}]\frac{m}{p}$
+  - Find $r_i, prev[r_i] and next[r_i]$ by computing T1, T2 and T3 with associated pointers row by row.(T values computed with parallel prefix)
+    
+[Missing]
+
+
+Termination conditions:
+  - Only 1 processor assigned to group
+  - No special rows in group's region or only special row is topmost row
 [Stopped here - end of page 7]
