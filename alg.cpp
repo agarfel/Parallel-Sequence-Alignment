@@ -19,6 +19,33 @@ struct extended_P {
     int s, e;   // Start and End type for (sub)problem
 };
 
+class Matrix {
+public:
+
+    int n, m;
+    int** data;
+
+    Matrix(){}
+
+    Matrix(int n, int m){
+        this->n = n;
+        this->m = m;
+
+        data = new int*[n];
+        for(int i = 0; i<n; i++){
+            data[i] = new int[m];
+        }
+    }
+
+    ~Matrix(){
+        delete[] data;
+    }
+
+    int* operator[](int i){
+        return data[i];
+    }
+};  
+
 /*
 Get alignement type 
 */
