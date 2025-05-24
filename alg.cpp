@@ -1,62 +1,15 @@
 
-#include <algorithm>
-#include <initializer_list>
-#include <vector>
-#include <limits>
-#include <math>
-#include "read_fasta.cpp"
+#include "alg.h"
 
 /*
 Matrix: m rows, n columns
 */
-
-typedef std::string str;
-typedef std::pair<int, int> pair;
-typedef std::vector<pair> alignment; // C = ((i_1, j_1), (i_2, j_2), ..., (i_n, j_n)) the indexes of the match (0 if it's a gap)
-int INF = std::numeric_limits<int>::min();
-int SUP = std::numeric_limits<int>::max();
-
-const int gap_creation_penalty = 2; // h
-const int gap_penalty = 1;  // g
-const int match_score = 2;
-
-struct extended_P {
-    str A, B;   // Sequences A and B
-    int s, e;   // Start and End type for (sub)problem
-};
 
 class cell{
 public:
     int value;
     struct cell *next, *prev;
 };
-
-class Matrix {
-public:
-
-    int n, m;
-    struct cell** data;
-
-    Matrix(){}
-
-    Matrix(int n, int m){
-        this->n = n;
-        this->m = m;
-
-        data = new cell*[n];
-        for(int i = 0; i<n; i++){
-            data[i] = new cell[m];
-        }
-    }
-
-    ~Matrix(){
-        delete[] data;
-    }
-
-    cell* operator[](int i){
-        return data[i];
-    }
-};  
 
 /*
 Get alignement type 
@@ -299,4 +252,76 @@ int solve(str A, str B, int p){
 
     decompose(0, m, p, n, m, -1, -1);
 
+}
+
+/*
+Function called by each thread.
+    B : substring thread is responsible for
+    A : pointer to string A (in global memory)
+    p : number of threads
+    id : number of this thread
+    n : length of A
+
+    *Alignment : pointer to resulting alignment for this thread
+    *Score : pointer to resulting score for this thread
+
+*/
+void thread_f(str B, str* A, int p, int id, int n){
+    Working[id] = 1;
+    int first = 1;
+    int last = p;
+    int r_up = 0;
+    int r_down = n;
+
+    // Decomposing
+    while ((first != last) && ((r_down - r_up) < n/p)){
+        // Compute T
+        /*
+            Each thread computes their section (functional programming lambda calculus style?)
+            Use conditional variable (wait) to get the cell it depends on from other processor
+        */
+       std::vector<int> T1_curr(l + 1, INT_MIN);
+       std::vector<int> T2_curr(l + 1, INT_MIN);
+       std::vector<int> T3_curr(l + 1, INT_MIN);
+
+        // INSERT SYNCHRONISATION POINT IF NECESSARY
+
+        // Compute TRev
+
+        // INSERT SYNCHRONISATION POINT IF NECESSARY
+
+        // Compute opt for these columns
+        // Compute max(OPT)
+
+        // SYNCHRONISATION POINT:
+       if (first == id){    // Current thread is Head
+        // Wait until all other threads in group are done (Worker[i] = 0)
+
+        // Compute Max(OPT) in group
+
+
+        // Update first, last, r_up, r_down for all workers in group as needed
+
+        // Notify group to continue execution (set working[i] = 1 for others in group)
+
+        } else {
+            Working[id] = 0;
+            update.notify_all();
+                // Wait until Working[id] = 1 (Head notifies rest to continue execution)
+        }
+
+
+    }
+
+    // SOLVE SUBPROBLEM
+
+
+}
+
+int main(A, B){
+    // Create workers
+
+    // join workers
+
+    // join solutions
 }
