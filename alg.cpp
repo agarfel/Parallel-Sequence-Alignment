@@ -264,9 +264,14 @@ Function called by each thread.
 
     *Alignment : pointer to resulting alignment for this thread
     *Score : pointer to resulting score for this thread
+    column matrix of size len(A)x3 (t1,t2,t3)
+
+    row matrix of size (lenB)x3 for storing partial results
+
+    vector threads with first, last, r_up and r_down in global memory?
 
 */
-void thread_f(str B, str* A, int p, int id, int n){
+void thread_f(str B, str* A, int p, int id, int n, std::vector<int> column){
     Working[id] = 1;
     int first = 1;
     int last = p;
@@ -275,23 +280,75 @@ void thread_f(str B, str* A, int p, int id, int n){
 
     // Decomposing
     while ((first != last) && ((r_down - r_up) < n/p)){
+        if(id even){
         // Compute T
         /*
             Each thread computes their section (functional programming lambda calculus style?)
-            Use conditional variable (wait) to get the cell it depends on from other processor
+            Keep rightmost column
         */
        std::vector<int> T1_curr(l + 1, INT_MIN);
        std::vector<int> T2_curr(l + 1, INT_MIN);
        std::vector<int> T3_curr(l + 1, INT_MIN);
 
-        // INSERT SYNCHRONISATION POINT IF NECESSARY
+
+        }
+        else if (id odd){
 
         // Compute TRev
+        }
 
-        // INSERT SYNCHRONISATION POINT IF NECESSARY
+        // SYNCHRONISATION POINT:
+        if (first == id){    // Current thread is Head
+            // Wait until all other threads in group are done (Worker[i] = 0)
 
-        // Compute opt for these columns
-        // Compute max(OPT)
+            // memcopy last T column to global memory column
+            
+            if (id != last -1){
+                update worker[id+2] = 1 //for columns
+                notify all
+            }
+
+    
+        } else if (if == last) {
+            if (id != first +1){
+                update worker[id-2] = 1 //for columns
+                notify all
+            }
+        } else {
+                Working[id] = 0;
+                update.notify_all();
+                // Wait until Working[id] = 1 (Head notifies rest to continue execution)
+            if (id even){
+                // memcopy last T column to global memory column
+                // solve dependencies
+                if (id != last){
+                    update worker[id+2] = 1
+                    notify all
+                }
+                wait (worker[id+1] == 0)
+
+                //compute opt for row
+                store opt info in global row[i] //first index of column group
+
+            } if (id odd){
+                // memcopy first T column to global memory column
+                // solve dependencies
+
+                // memcopy last Trev row to global memory row
+                if (id != first + 1){
+                    update worker[id-2] = 1
+                    notify all
+                }
+                worker[id] = 0
+                notify all
+            }
+        }
+    
+        /*
+        At this point, the row matrix should contain all the information on Trev to compute opt and all dependencies should be solved
+
+        the even threads have computed max(opt) for their group of columns and stored optimal on global row[id*l]
+        */
 
         // SYNCHRONISATION POINT:
        if (first == id){    // Current thread is Head
@@ -300,25 +357,27 @@ void thread_f(str B, str* A, int p, int id, int n){
         // Compute Max(OPT) in group
 
 
-        // Update first, last, r_up, r_down for all workers in group as needed
+        // Update first, last, r_up, r_down for all workers in group as needed (in global memory?)
 
         // Notify group to continue execution (set working[i] = 1 for others in group)
 
         } else {
             Working[id] = 0;
             update.notify_all();
-                // Wait until Working[id] = 1 (Head notifies rest to continue execution)
+            // Wait until Working[id] = 1 (Head notifies rest to continue execution)
         }
 
-
     }
-
+    if (id even){
     // SOLVE SUBPROBLEM
-
+    }
 
 }
 
 int main(A, B){
+    /*
+    We want p even
+    */
     // Create workers
 
     // join workers
