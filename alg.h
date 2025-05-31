@@ -24,9 +24,6 @@ struct extended_P {
     int s, e;   // Start and End type for (sub)problem
 };
 
-std::vector<int> Working; // vector of size p, Working[i] = 1 if thread i is working, 0 otherwise
-std::condition_variable update; // notifies if there's a change to Working
-
 
 class Matrix {
 public:

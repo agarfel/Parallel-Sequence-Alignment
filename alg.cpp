@@ -254,6 +254,9 @@ int solve(str A, str B, int p){
 
 }
 
+
+
+
 /*
 Function called by each thread.
     B : substring thread is responsible for
@@ -271,76 +274,111 @@ Function called by each thread.
     vector threads with first, last, r_up and r_down in global memory?
 
 */
-void thread_f(str B, str* A, int p, int id, int n, std::vector<int> column){
+void thread_f(str B, str* A, int p, int id, int n, std::vector<int> Working, std::condition_variable update, std::vector<std::vector<cell>>* column, std::vector<std::vector<cell>>* row){
     Working[id] = 1;
-    int first = 1;
-    int last = p;
-    int r_up = 0;
-    int r_down = n;
+    int columns = B.size();
+    int rows = n / p;
+
+    int col_k1 = 1; // index of first special column (in group)
+    int col_k2 = p; // index of last special column (in group)
+    int row_k1 = 0; // index of first special row (in group)
+    int row_k2 = n; // index of last special row (in group)
+
+    int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
+
 
     // Decomposing
-    while ((first != last) && ((r_down - r_up) < n/p)){
-        if(id even){
+    while ((col_k1 + 1 != col_k2) && (row_k1 +1 != r_up)){
+        std::vector<cell> T1_curr(l + 1);
+        std::vector<cell> T2_curr(l + 1);
+        std::vector<cell> T3_curr(l + 1);
+
+        std::vector<cell> T1_prev(l + 1);
+        std::vector<cell> T2_prev(l + 1);
+        std::vector<cell> T3_prev(l + 1);
+
+        std::vector<std::vector<cell>> local_col;
+        if(id % 2 = 0){
         // Compute T
         /*
             Each thread computes their section (functional programming lambda calculus style?)
-            Keep rightmost column
+            Keep rightmost column in local_col
         */
-       std::vector<int> T1_curr(l + 1, INT_MIN);
-       std::vector<int> T2_curr(l + 1, INT_MIN);
-       std::vector<int> T3_curr(l + 1, INT_MIN);
 
-
-        }
-        else if (id odd){
+        } else { // id odd ==> compute TRev
 
         // Compute TRev
         }
 
+
         // SYNCHRONISATION POINT:
-        if (first == id){    // Current thread is Head
+        if (2*col_k1 == id){    // Current thread is Head
+            Working[id] = 2;
+            update.notify_all();
+
             // Wait until all other threads in group are done (Worker[i] = 0)
+            while(std::min(Working[col_k1:col_k2]) == 1){
+                update.wait();
+            }
 
             // memcopy last T column to global memory column
             
+            
             if (id != last -1){
-                update worker[id+2] = 1 //for columns
-                notify all
+                Working[id+2] = 3; // Start propagation T
+                Working[col_k2*2 +1] = 3; // Start propagation Trev
+                update.notify_all();
             }
 
     
-        } else if (if == last) {
-            if (id != first +1){
-                update worker[id-2] = 1 //for columns
-                notify all
+        } else if (id == col_k2*2 +1) { // Last thread (TRev)
+            while(Working[id] != 3){
+                update.wait();
+            }
+
+            // memcopy first TRev column to global memory column
+            if (id != col_k1*2 +1){
+                Working[id-2] = 3; // Start propagation
+                update.notify_all();
             }
         } else {
-                Working[id] = 0;
-                update.notify_all();
-                // Wait until Working[id] = 1 (Head notifies rest to continue execution)
-            if (id even){
+            Working[id] = 0;
+            update.notify_all();
+
+            // Wait until Working[id] = 3 (Notification to continue propagation)
+            while(Working[id] != 3){
+                update.wait();
+            }
+
+            if (id % 2 == 0){ // Even
                 // memcopy last T column to global memory column
                 // solve dependencies
-                if (id != last){
-                    update worker[id+2] = 1
-                    notify all
+
+                if (id != col_k2*2){
+                    Working[id+2] = 3;
+                    update.notify_all();
                 }
-                wait (worker[id+1] == 0)
+                Working[id] = 4;
+                while(Working[id+1] != 4){
+                    update.wait();
+                }
 
                 //compute opt for row
-                store opt info in global row[i] //first index of column group
+                // store opt info in global row[i] //first index of column group
 
-            } if (id odd){
+                Working[id] = 5;
+                update.notify_all();
+
+            } else { // ODD
                 // memcopy first T column to global memory column
                 // solve dependencies
 
                 // memcopy last Trev row to global memory row
-                if (id != first + 1){
-                    update worker[id-2] = 1
-                    notify all
+                Working[id] = 5;
+                if (id != col_k1*2 + 1){
+                    Working[id-2] = 3;
+                    update.notify_all();
                 }
-                worker[id] = 0
-                notify all
             }
         }
     
@@ -351,8 +389,11 @@ void thread_f(str B, str* A, int p, int id, int n, std::vector<int> column){
         */
 
         // SYNCHRONISATION POINT:
-       if (first == id){    // Current thread is Head
-        // Wait until all other threads in group are done (Worker[i] = 0)
+       if (col_k1*2 == id){    // Current thread is Head
+            // Wait until all other threads in group are done (Worker[i] = 5)
+            while(std::min(Working[col_k1:col_k2]) == 5){
+                update.wait();
+            }
 
         // Compute Max(OPT) in group
 
@@ -360,27 +401,42 @@ void thread_f(str B, str* A, int p, int id, int n, std::vector<int> column){
         // Update first, last, r_up, r_down for all workers in group as needed (in global memory?)
 
         // Notify group to continue execution (set working[i] = 1 for others in group)
-
+        for (i = col_k1; i <= col_k2; i++){
+            Working[i] = 1;
+        }
+        update.notify_all();
         } else {
             Working[id] = 0;
-            update.notify_all();
-            // Wait until Working[id] = 1 (Head notifies rest to continue execution)
+            while(Working[id] != 1){
+                update.wait();
+            }
         }
+    }
+    if (id%2 == 1){ // Even threads solve subproblem
+        return;
+    }
 
-    }
-    if (id even){
     // SOLVE SUBPROBLEM
-    }
+
 
 }
 
-int main(A, B){
+int main(A, B, p){
     /*
     We want p even
     */
+   if (p % 2 == 1){
+    std::cout << "ERROR: Only accept even number of processors." << std::endl;
+    return 1;
+
+   }
+   std::condition_variable update; // notifies if there's a change to Working
+   std::vector<int> Working(p, 0); // vector of size p, Working[i] = 1 if thread i is working, 0 otherwise
+
     // Create workers
 
     // join workers
 
     // join solutions
 }
+
