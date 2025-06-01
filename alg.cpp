@@ -63,6 +63,13 @@ Compute Score Extended Sequence Alignment
 int esc(alignment C, extended_P P){
     return escs(C, P)+ esce(C,P) + sc(C,P);
 }
+/*
+Compute function f for char matching
+*/
+int f(char a, char b){
+    if(a == b){return 2;} 
+    return 0;
+}
 
 /*
 
@@ -276,8 +283,11 @@ Function called by each thread.
 */
 void thread_f(str B, str* A, int p, int id, int n, std::vector<int> Working, std::condition_variable update, std::vector<std::vector<cell>>* column, std::vector<std::vector<cell>>* row){
     Working[id] = 1;
-    int columns = B.size();
-    int rows = n / p;
+    int special_columns = B.size(); // columns should be devided by the number of processors not row
+    int special_rows = n / p; 
+
+    // dont forget to define the A1 copy of A that we use in the algorithm
+    str A1;
 
     int col_k1 = 1; // index of first special column (in group)
     int col_k2 = p; // index of last special column (in group)
@@ -289,6 +299,7 @@ void thread_f(str B, str* A, int p, int id, int n, std::vector<int> Working, std
 
     // Decomposing
     while ((col_k1 + 1 != col_k2) && (row_k1 +1 != r_up)){
+        // Create A1
         std::vector<cell> T1_curr(l + 1);
         std::vector<cell> T2_curr(l + 1);
         std::vector<cell> T3_curr(l + 1);
@@ -299,11 +310,68 @@ void thread_f(str B, str* A, int p, int id, int n, std::vector<int> Working, std
 
         std::vector<std::vector<cell>> local_col;
         if(id % 2 = 0){
-        // Compute T
-        /*
-            Each thread computes their section (functional programming lambda calculus style?)
-            Keep rightmost column in local_col
-        */
+
+            bool ishead = (2*col_k1 == id);
+            int m = B.size() / p // amount of columns per thread
+            if(ishead){
+                m += (B.size() % p);
+            }
+            std::vector<int> T1_row1(m), T1_row2(m), T2_row1(m), T2_row2(m), T3_row1(m), T3_row2(m);
+            std::vector<int> T1_ext_row(m+1), T2_ext_row(m+1), T3_ext_row(m+1); // extra one because 0 is the corner 
+            std::vector<int> T1_ext_col(n), T1_ext_col(n), T1_ext_col(n); // only used for head 
+            int T1_global[2], T2_global[2], T3_global[2];
+
+            if(ishead){
+                T1_global[0] = T1_ext_row[0];
+                T1_global[1] = T1_ext_col[0];
+                T2_global[0] = T2_ext_row[0];
+                T2_global[1] = T2_ext_col[0];
+                T3_global[0] = T3_ext_row[0];
+                T3_global[1] = T3_ext_col[0];
+            }
+
+            // i == 0
+            // j == 0
+            // WAIT HERE WAIT HERE to update local globals 
+            T1_row1[0] = f(A1[0], B[0]) + std::max({T1_ext_row[0], T2_ext_row[0], T3_ext_row[0]});
+            T3_row1[0] = std::max({T1_ext_row[1] - (g+h), T2_ext_row[1] - (g+h), T3_ext_row[1] - g});
+            T2_row1[0] = std::max({T1_global[1] - (g+h), T2_global[1] - g, T3_global[1] - (g+h)});
+
+            for(int j = 1; j<m; j++){
+                T1_row1[j] = f(A1[0], B[j]) + std::max({T1_ext_row[0], T2_ext_row[0], T3_ext_row[0]});
+                T3_row1[j] = std::max({T1_ext_row[j+1] - (g+h), T2_ext_row[j+1] - (g+h), T3_ext_row[j+1] - g});
+                T2_row1[j] = std::max({T1_row1[j-1] - (g+h), T2_row1[j-1] - g, T3_row1[j-1] - (g+h)});
+            }
+
+            for(int i = 1; i < n; i++){
+
+                if(ishead){
+                    T1_global[0] = T1_global[1];
+                    T1_global[1] = T1_ext_col[i];
+                    T2_global[0] = T2_global[1];
+                    T2_global[1] = T2_ext_col[i];
+                    T3_global[0] = T3_global[1];
+                    T3_global[1] = T3_ext_col[i];
+                }
+
+                // WAIT HERE WAIT HERE to update local globals 
+                // j == 0
+                T1_row2[0] = f(A1[i], B[0]) + std::max({T1_global[0], T2_global[0], T3_global[0]});
+                T3_row2[0] = std::max({T1_row1[0] - (g+h), T2_row1[0] - (g+h), T3_row1[0] - g});
+                T2_row2[0] = std::max({T1_global[1] - (g+h), T2_global[1] - g, T3_global[1] - (g+h)});
+
+                for(int j = 1; j < m; j++){
+
+                    iT1_row2[j] = f(A1[i], B[j]) + std::max({T1_row1[j-1], T2_row1[j-1], T3_row1[j-1]});
+                    iT3_row2[j] = std::max({T1_row1[j] - (g+h), T2_row1[j] - (g+h), T3_row1[j] - g});
+                    iT2_row2[j] = std::max({T1_row1[j-1] - (g+h), T2_row2[j-1] - g, T3_row2[j-1] - (g+h)});
+                }
+
+                std::swap(T1_row1, T1_row2);
+                std::swap(T2_row1, T2_row2);
+                std::swap(T3_row1, T3_row2);
+            }
+
 
         } else { // id odd ==> compute TRev
 

@@ -19,6 +19,9 @@ const int gap_creation_penalty = 2; // h
 const int gap_penalty = 1;  // g
 const int match_score = 2;
 
+const int h = gap_creation_penalty;
+const int g = gap_penalty;
+
 struct extended_P {
     str A, B;   // Sequences A and B
     int s, e;   // Start and End type for (sub)problem
