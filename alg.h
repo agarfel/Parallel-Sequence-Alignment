@@ -1,14 +1,12 @@
-
 #include <algorithm>
 #include <initializer_list>
 #include <vector>
 #include <limits>
 #include "read_fasta.cpp"
 #include <condition_variable>
-#include <math>
-#include "read_fasta.cpp"
+#include <cmath>
 
-typedef std::string str;
+typedef std::vector<char> str;
 typedef std::vector<std::pair<int, int>> alignment; // C = ((i_1, j_1), (i_2, j_2), ..., (i_n, j_n)) the indexes of the match (0 if it's a gap)
 typedef std::pair<int, int> pair;
 
@@ -25,6 +23,30 @@ const int g = gap_penalty;
 struct extended_P {
     str A, B;   // Sequences A and B
     int s, e;   // Start and End type for (sub)problem
+};
+
+class cell{
+public:
+    cell(int v, int n, int p){value = v; next = n; prev = p;}
+    int value;
+    int next, prev;
+};
+
+class result{
+    int TO_DO;
+};
+
+class Info{
+public:
+    Info(int f, int l, int t, int b, int st, int et) {
+        first = f;
+        last = l;
+        top_row = t;
+        bottom_row = b;
+        s = st;
+        e = et;
+    }
+    int first, last, top_row, bottom_row, s, e;
 };
 
 
@@ -62,3 +84,13 @@ int esce(alignment, extended_P);
 int esc(alignment, extended_P);
 
 void thread_f(str B, str* A, int first, int last);
+
+/*
+Working values:
+    1. Computing T: Read from global
+    2. Computing T: Wrote to global
+    3. Done computing T
+    4. Done computing Opt
+    
+    X. Solving sub-problem
+*/
