@@ -40,6 +40,7 @@ using their positions relative to the substrings*/
 class alignment {
     std::vector<std::pair<int, int>> data;  // (i,j) i index in A, j index in B (start with i=0 ; -1 ==> Gap)
 
+    alignment(){}
 
     int type(int k){
         if (k >= data.size()){return -1;}
@@ -55,6 +56,8 @@ class alignment {
 class result{
     int Score;
     alignment alignment;
+
+    result(){}
 };
 
 class Info{
