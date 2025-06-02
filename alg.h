@@ -7,7 +7,6 @@
 #include <cmath>
 
 typedef std::vector<char> str;
-typedef std::vector<std::pair<int, int>> alignment; // C = ((i_1, j_1), (i_2, j_2), ..., (i_n, j_n)) the indexes of the match (0 if it's a gap)
 typedef std::pair<int, int> pair;
 
 int INF = std::numeric_limits<int>::min();
@@ -32,8 +31,30 @@ public:
     int next, prev;
 };
 
+/*
+When aligning substrings of A0 and B0 ,
+we still use original positions of characters
+in A0 and B0 to model the alignment, as opposed to
+using their positions relative to the substrings*/
+
+class alignment {
+    std::vector<std::pair<int, int>> data;  // (i,j) i index in A, j index in B (start with i=0 ; -1 ==> Gap)
+
+
+    int type(int k){
+        if (k >= data.size()){return -1;}
+        if (data[k].first == -1 ){           // Gap in A
+            return 2;
+        } else if(data[k].second != -1){    // Gap in B
+            return 3;
+        } else {
+            return 1;
+        }
+    }
+};
 class result{
-    int TO_DO;
+    int Score;
+    alignment alignment;
 };
 
 class Info{
