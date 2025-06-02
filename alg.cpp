@@ -466,24 +466,24 @@ result solve_subproblem(str A, str B, ){
 
     while (i > 0 || j > 0) {
         if (state == 1) { // T1
-            res.alignement.push_back(pair(i-1, j-1));
+            res.alignement.data.push_back(pair(i-1, j-1));
             int bt = BT1[i][j];
             i--; j--;
             state = bt;
         } else if (state == 2) { // T2
-            res.alignement.push_back(pair(-1, j-1));
+            res.alignement.data.push_back(pair(-1, j-1));
             int bt = BT2[i][j];
             j--;
             state = bt;
         } else if (state == 3) { // T3
-            res.alignement.push_back(pair(i-1, -1));
+            res.alignement.data.push_back(pair(i-1, -1));
             int bt = BT3[i][j];
             i--;
             state = bt;
         }
     }
 
-    std::reverse(res.alignment.begin(), res.alignment.end());
+    std::reverse(res.alignment.data.begin(), res.alignment.data.end());
     return res;
 }
 
