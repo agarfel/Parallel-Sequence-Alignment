@@ -353,6 +353,14 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         T2_curr[j].origin_row = T3_curr[j-1].origin_row;
                         T2_curr[j].origin_type = T3_curr[j-1].origin_type;   
                     }
+                    if (j == 1){
+                        T1_curr[1].origin_row = i;
+                        T1_curr[1].origin_type = 1;
+                        T2_curr[1].origin_row = i;
+                        T2_curr[1].origin_type = 2;
+                        T3_curr[1].origin_row = i;
+                        T3_curr[1].origin_type = 3;
+                    }
                 }
 
                 // Share last value:
@@ -390,7 +398,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             std::vector<cell> T1_Rev(sharingTRev->at(0).begin() + start, sharingTRev->at(0).begin() + end);
             std::vector<cell> T2_Rev(sharingTRev->at(1).begin() + start, sharingTRev->at(1).begin() + end);
             std::vector<cell> T3_Rev(sharingTRev->at(2).begin() + start, sharingTRev->at(2).begin() + end);
-
 
             for (int j = 0; j < num_cols; j++){
                 int tmp;
@@ -452,8 +459,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             if(id == col_k2+1){ // Is "sub-head"
                 // [i'-1, j'-1]
                 if (s == -1){ T1_prev[0].value = 0; }
-                if (s == -2){ T2_prev[0].vale = 0;}
-                if (s == -3){ T3_prev[0].vale = 0;}
+                if (s == -2){ T2_prev[0].value = 0;}
+                if (s == -3){ T3_prev[0].value = 0;}
                 
             }
 
@@ -543,6 +550,14 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         T2_curr[j].r_row = T3_curr[j+1].r_row;
                         T2_curr[j].r_type = T3_curr[j+1].r_type;   
                     }
+                    if (j == num_cols -1){
+                        T1_curr[num_cols -1].r_row = i;
+                        T1_curr[num_cols -1].r_type = 1;
+                        T2_curr[num_cols -1].r_row = i;
+                        T2_curr[num_cols -1].r_type = 2;
+                        T3_curr[num_cols -1].r_row = i;
+                        T3_curr[num_cols -1].r_type = 3;
+                    }
                 }
 
                 // Share last value:
@@ -589,15 +604,15 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             for (int j = 0; j < num_blocks; j++){
                 if ((*sharingOpt)[j].value > max_opt.value){
                     max_opt = (*sharingOpt)[j];
+                    leftmost_col = j;
                 }
             }
 
             // SPLIT PROBLEM
-            int r1 = max_opt.origin_row
-            int r2 = max_opt.r_row; // rows where we split the problem [get using next and prev]
-            int t1 = origin_type;
-            int t2 = r_type; // types where we split the problem
-
+            int r1 = max_opt.origin_row  + row_k1;
+            int r2 = max_opt.r_row + row_k1; // rows where we split the problem [get using next and prev]
+            int t1 = max_opt.origin_type;
+            int t2 = max_opt.r_type; // types where we split the problem
 
             for (int thread_id = col_k1; thread_id < leftmost_col + 1; thread_id++){
                 info[thread_id] = Info(col_k1, leftmost_col, row_k1, r1, s, t1);
