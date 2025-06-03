@@ -418,13 +418,17 @@ int from(int best, int t1, int t2, int t3){
     return 3;
 }
 
-result solve_subproblem(str A, str B, ){
-    // what is left : think about initialization, think about start/end types, check if function correct
+/* function should be correct, watch out for out of bound indices in the trace back maybe but otherwise it works */
+result solve_subproblem(extended_P sub_problem){ // one or two sub_problems
+
+    str A = sub_problem.A;
+    str B = sub_problem.B;
+    int start_type = sub_problem.s; // -t1 or -t2
+    int end_type = sub_problem.e; // -t3 or t2
 
     result res;
 
     /* computing the matrices and the score */
-    int eps = -1e9;
 
     // n rows, m columns
     int n = A.size();
@@ -432,23 +436,55 @@ result solve_subproblem(str A, str B, ){
     Matrix T1(n+1,m+1), T2(n+1,m+1), T3(n+1,m+1);
     Matrix BT1(n+1,m+1), BT2(n+1,m+1), BT3(n+1,m+1);
 
-    //initialize first row and first column
-    for(int j = 0; j < m+1; j++){
-        T1[0][j] = h + (j-1)*g;
-        T2[0][j] = h + (j-1)*g;
-        T3[0][j] = eps;
+    // Initialize all cells to -1
+    for (int i = 0; i <= n; ++i) {
+        for (int j = 0; j <= m; ++j) {
+            T1[i][j] = -1;
+            T2[i][j] = -1;
+            T3[i][j] = -1;
+        }
     }
-    for(int i = 0; i < n+1; i++){
-        T1[i][0] = h + (i-1)*g;
-        T2[i][0] = h + (i-1)*g;
-        T3[i][0] = eps;
+
+    // initialize top-left corner
+    int abs_type = std::abs(start_type);
+    
+    if (abs_type == 1) {
+        T1[0][0] = 0;
+    } else if (abs_type == 2) {
+        T2[0][0] = 0;
+    } else if (abs_type == 3) {
+        T3[0][0] = 0;
+    }
+
+    // initialize first row
+    for (int j = 1; j <= m; ++j) {
+        if (start_type == 3) {
+            T3[0][j] = -(h + g);
+        } else if (start_type == -3) {
+            T3[0][j] = -g * j;
+        } else if (start_type == -1 || start_type == -2) {
+            T3[0][j] = -(h + g * j);
+        }
+        // else T3[0][i] stays -1
+    }
+
+    // initialize first column 
+    for (int i = 1; i <= n; ++i) {
+        if (start_type == 2) {
+            T2[i][0] = -(h + g);
+        } else if (start_type == -2) {
+            T2[i][0] = -g * i;
+        } else if (start_type == -1 || start_type == -3) {
+            T2[i][0] = -(h + g * i);
+        }
+        // else T2[j][0] stays -1
     }
 
     //recurrence relation
     for(int i = 1; i < n+1; i++){
         for(int j = 1; j < m+1; j++){
             int T1_best = std::max({T1[i-1][j-1], T2[i-1][j-1], T3[i-1][j-1]});
-            T1[i][j] = f(A[i], B[j]) + T1_best
+            T1[i][j] = f(A[i-1], B[j-1]) + T1_best;
             BT1[i][j] = from(T1_best, T1[i-1][j-1], T2[i-1][j-1], T3[i-1][j-1]);
             int T2_best = std::max({(T1[i][j-1] -(g+h)), (T2[i][j-1] - g), (T3[i][j-1] -(g+h))});
             T2[i][j] = T2_best;
@@ -458,7 +494,14 @@ result solve_subproblem(str A, str B, ){
             BT3[i][j] = from(T3_best, (T1[i-1][j] -(g+h)), (T2[i-1][j] -(g+h)), (T3[i-1][j] - g));
         }   
     }
-    res.score = std::max({T1[n][m], T2[n][m], T3[n][m]}) ; // not sure about that one ?
+
+    if (end_type > 0) {
+        if (end_type == 1){ res.score = T1[n][m];}
+        else if (end_type == 2) {res.score = T2[n][m];}
+        else {res.score = T3[n][m];}
+    } else {
+        res.score = max({ T1[n][m], T2[n][m], T3[n][m] });
+    }
 
     /* doing the traceback */
     int state = from(res.score, T1[n][m], T2[n][m], T3[n][m]);
@@ -466,17 +509,17 @@ result solve_subproblem(str A, str B, ){
 
     while (i > 0 || j > 0) {
         if (state == 1) { // T1
-            res.alignement.data.push_back(pair(i-1, j-1));
+            res.alignment.data.push_back({i-1, j-1});
             int bt = BT1[i][j];
             i--; j--;
             state = bt;
         } else if (state == 2) { // T2
-            res.alignement.data.push_back(pair(-1, j-1));
+            res.alignement.data.push_back({-1, j-1});
             int bt = BT2[i][j];
             j--;
             state = bt;
         } else if (state == 3) { // T3
-            res.alignement.data.push_back(pair(i-1, -1));
+            res.alignement.data.push_back({i-1, -1});
             int bt = BT3[i][j];
             i--;
             state = bt;
