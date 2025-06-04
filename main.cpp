@@ -612,13 +612,14 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     std::condition_variable update; // notifies if there's a change to Working
     std::vector<int> Working(p, 1); // vector of size p, Working[i] = 1 if thread i is working, 0 otherwise
     std::vector<std::mutex> working_mutexes(p);
-    std::vector<std::vector<int>>* sharingT = new std::vector<std::vector<int>>(3, std::vector<int>(p));
-    std::vector<std::vector<int>>* sharingTRev = new std::vector<std::vector<int>>(3, std::vector<int>(B.size()));
+    std::vector<std::vector<cell>>* sharingT = new std::vector<std::vector<cell>>(3, std::vector<cell>(p));
+    std::vector<std::vector<cell>>* sharingTRev = new std::vector<std::vector<cell>>(3, std::vector<cell>(B.size()));
     std::vector<cell>* sharingOpt = new std::vector<cell>(p/2, cell(INF));
     std::vector<Info>* info = new std::vector<Info>(p/2, Info(0,p/2, 0, B.size()/p, -1, -1));
 
     for (int i = 0; i<p; i++){
-        workers[i] = std::thread(thread_f, &A, &B, p,i, A.size(), B.size(), std::ref(Working), std::ref(working_mutexes), std::ref(update), sharingTRev, sharingOpt, std::ref(info), std::ref(results[i]));
+        workers[i] = std::thread(thread_f, A.data(), B.data(), p,i, A.size(), B.size(), std::ref(Working),
+        std::ref(working_mutexes), std::ref(update), sharingT, sharingTRev, sharingOpt, std::ref(*info), std::ref(results[i]));
     }
     int TotalScore = 0;
     alignment FinalAlignment;
@@ -628,7 +629,7 @@ int run(std::vector<char> A, std::vector<char> B, int p){
         FinalAlignment += results[i].al;
     }
 
-    // join solutions
+    return 0;
 }
 
 int main(){

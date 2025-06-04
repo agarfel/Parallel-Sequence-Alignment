@@ -25,9 +25,8 @@ struct extended_P {
 
 class cell{
 public:
-    cell(int v){
-        value = v;
-    }
+    cell() : value(INF) {}
+    cell(int v) : value(v) {}
     int value, origin_type, origin_row, r_type, r_row;
 };
 /*
