@@ -8,6 +8,7 @@
 #include <cmath>
 #include <thread>
 #include <cstring>
+#include <chrono>
 
 int f(char a, char b){
     if(a == b){return 2;} 
@@ -184,6 +185,15 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     // Decomposing
     while (((col_k1 + 1 != col_k2) && (row_k1 +1 != row_k2)) && p > 2){
         std::cout<<"Start Decomposing - Thread  "<< id << std::endl;
+            std::cout << "THREAD " << id << "\n"
+            << "num_cols: " << num_cols << "\n"
+            << "p: " << p << "\n"
+            << "col_k1: " << col_k1 << "\n"
+            << "col_k2: " << col_k2 << "\n"
+            << "row_k1: " << row_k1 << "\n"
+            << "row_k2: " << row_k2 << "\n"
+            << "s: " << s << "\n"
+            << "e: " << e << std::endl;
 
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
@@ -354,14 +364,14 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 std::swap(T3_prev, T3_curr);
 
             }
-            std::cout<<"Computed T - Thread  "<< id << std::endl;
+            // std::cout<<"Computed T - Thread  "<< id << std::endl;
 
             // Wait until TRev Computed for this set of columns
             std::unique_lock<std::mutex> lock(working_mutexes[id+1]);
             while (working[id+1] != 4){
                 update.wait(lock);
             }
-            std::cout<<"Computing Local OPT - Thread  "<< id << std::endl;
+            // std::cout<<"Computing Local OPT - Thread  "<< id << std::endl;
 
             // Copmute opt
             cell max_opt(INF);
@@ -581,18 +591,20 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             std::lock_guard<std::mutex> lock(working_mutexes[id]);
             working[id] = 4;
         }
-        std::cout<<"Synchronising - Thread  "<< id << std::endl;
+        // std::cout<<"Synchronising - Thread  "<< id << std::endl;
 
         update.notify_all();
 
 
         // SYNCHRONISATION POINT: all partial opt's are computed
         if (ishead){    // Current thread is Head
-            std::unique_lock<std::mutex> lock(working_mutexes[id]);
-            while (*std::min_element(working.begin() + col_k1*2, working.begin() + col_k2*2+1) != 4) {
-                update.wait(lock);
+            {
+                std::unique_lock<std::mutex> lock(working_mutexes[id]);
+                while (*std::min_element(working.begin() + col_k1*2, working.begin() + col_k2*2+1) != 4) {
+                    update.wait(lock);
+        }
             }
-            std::cout<<"Computing Global OPT - Thread  "<< id << std::endl;
+            // std::cout<<"Computing Global OPT - Thread  "<< id << std::endl;
 
             // Get Max OPT
             cell max_opt(INF);
@@ -604,7 +616,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     leftmost_col = j;
                 }
             }
-            std::cout<<"Splitting Problem - Thread  "<< id << std::endl;
+            // std::cout<<"Splitting Problem - Thread  "<< id << std::endl;
 
             // SPLIT PROBLEM
             int r1 = max_opt.origin_row  + row_k1;
@@ -612,7 +624,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             int t1 = max_opt.origin_type;
             int t2 = max_opt.r_type; // types where we split the problem
 
-            std::cout<<"Initialised vars - Thread  "<< id << std::endl;
+            // std::cout<<"Initialised vars - Thread  "<< id << std::endl;
 
             for (int thread_id = col_k1; thread_id < leftmost_col + 1; thread_id++){
                 info[thread_id] = Info(col_k1, leftmost_col, row_k1, r1, s, t1);
@@ -623,24 +635,31 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             info[leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2);
             info[leftmost_col+1] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2);
 
-            std::cout<<"Set new info - Thread  "<< id << std::endl;
-            std::cout<<"Current Working:  "<< working[0] <<working[1] <<working[2] <<working[3] <<working[4] <<working[5] << std::endl;
+            // std::cout<<"Set new info - Thread  "<< id << std::endl;
+            // std::cout<<"Current Working:  "<< working[0] <<working[1] <<working[2] <<working[3] <<working[4] <<working[5] << std::endl;
+            // std::this_thread::sleep_for(std::chrono::seconds(1));
 
             for (int k = col_k1; k < col_k2+1; k++){
-                {
-                    std::lock_guard<std::mutex> lock(working_mutexes[2*k]);
-                    working[2*k] = 1;
-                }
+                // std::cout<<"Setting Working  "<< 2*k+1 <<" to 1" << std::endl;
+
                 {
                     std::lock_guard<std::mutex> lock(working_mutexes[2*k+1]);
                     working[2*k+1] = 1;
                 }
+                // std::cout<<"Setting Working  "<< 2*k <<" to 1" << std::endl;
+
+                {
+                    std::lock_guard<std::mutex> lock(working_mutexes[2*k]);
+                    working[2*k] = 1;
+                }
+                // std::cout<<"Success" << std::endl;
+
             }
-            std::cout<<"Notify - Thread  "<< id << std::endl;
+            // std::cout<<"Notify - Thread  "<< id << std::endl;
 
             update.notify_all();
         } else {
-            std::unique_lock<std::mutex> lock(working_mutexes[id+2]);
+            std::unique_lock<std::mutex> lock(working_mutexes[id]);
             while (working[id] == 4){
                 update.wait(lock);
             }
@@ -655,11 +674,19 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         s = info[id].s;
         e = info[id].e;
 
-        // std::cout << "UPDATED INFO - Continuing Decomposition " << std::endl;
+        std::cout << "UPDATED INFO - Continuing Decomposition " << std::endl;
 
     }
     std::cout << "Solving Sub-problem - Thread " << id << std::endl;
-
+    std::cout << "THREAD " << id << "\n"
+            << "num_cols: " << num_cols << "\n"
+            << "p: " << p << "\n"
+            << "col_k1: " << col_k1 << "\n"
+            << "col_k2: " << col_k2 << "\n"
+            << "row_k1: " << row_k1 << "\n"
+            << "row_k2: " << row_k2 << "\n"
+            << "s: " << s << "\n"
+            << "e: " << e << std::endl;
 
     if (id%2 == 1){ // Even threads solve subproblem
 
