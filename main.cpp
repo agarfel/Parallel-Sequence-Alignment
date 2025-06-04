@@ -610,6 +610,33 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
 }
 
+void output_alignement(alignment alignment, str A, str B){
+    std::string al_A = "";
+    std::string al_B = "";
+    int len = alignment.data.size();
+
+    for(int k = 0; k < len; k++){
+        int i = alignment.data[k].first;
+        if(i == -1){
+            al_A += "-";
+        }
+        else{
+            al_A += A[i];
+        }
+        int j = alignment.data[k].second;
+        if(j == -1){
+            al_B += "-";
+        }
+        else{
+            al_B += B[j];
+        }
+    }
+    
+    std::cout << "Sequence A : " << al_A << std::endl;
+    std::cout << "Sequence B : " << al_B << std::endl;
+
+}
+
 int run(std::vector<char> A, std::vector<char> B, int p){
     /*
     We want p even
