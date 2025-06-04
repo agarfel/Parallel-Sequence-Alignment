@@ -151,6 +151,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<cell>>* sharingT,
     std::vector<std::vector<cell>>* sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
+    std::cout<<"Initialising Values - Thread "<< id << std::endl;
 
     int num_blocks = p / 2;
     int B_len;
@@ -166,23 +167,24 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     int num_special_rows = n / p; 
     int col_k1 = info[id].first; // index of first special column (in group)
     int col_k2 = info[id].last; // index of last special column (in group)
-    int row_k1 = info[id].top_row; // index of first special row (in group)
-    int row_k2 = info[id].bottom_row; // index of last special row (in group)
+    int row_k1 = info[id].top_row; // index of first row (in group)
+    int row_k2 = info[id].bottom_row; // index of last row (in group)
     int s = info[id].s;
     int e = info[id].e;
 
 
 
     // Decomposing
-    while ((col_k1 + 1 != col_k2) && (row_k1 +1 != row_k2)){
-        
+    while (((col_k1 + 1 != col_k2) && (row_k1 +1 != row_k2)) && p > 2){
+        std::cout<<"Start Decomposing - Thread  "<< id << std::endl;
+
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
 
         // Copy Section of A we want
-        int num_rows = (row_midk - row_k1)*p;
+        int num_rows = (row_midk - row_k1);
         std::vector<char> A(num_rows);
-        std::memcpy(A.data(), A_ptr + row_k1*(n/p), num_rows);
+        std::memcpy(A.data(), A_ptr + row_k1, num_rows);
 
         // Initialize curr and prev
         std::vector<cell> T1_curr(num_cols + 1);
@@ -592,9 +594,19 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     if (id%2 == 1){ // Even threads solve subproblem
         return;
     }
+    std::cout<<"Solving Subproblem - Thread "<< id << std::endl;
 
     // SOLVE SUBPROBLEM
+    int num_rows = (row_k2 - row_k1);
+    std::vector<char> A(num_rows);
+    std::memcpy(A.data(), A_ptr + row_k1, num_rows);
 
+    extended_P sub_problem;
+    sub_problem.A = A;
+    sub_problem.B = B;
+    sub_problem.s = s;
+    sub_problem.e = e;
+    result = solve_subproblem(sub_problem);
 
 }
 
@@ -606,7 +618,7 @@ int run(std::vector<char> A, std::vector<char> B, int p){
         std::cout << "ERROR: Only accept even number of processors." << std::endl;
         return 1;
     }
-
+    std::cout<<"Initialising Function Arguments" << std::endl;
     std::vector<std::thread> workers(p);
     std::vector<result> results(p);
     std::condition_variable update; // notifies if there's a change to Working
@@ -617,12 +629,15 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     std::vector<cell>* sharingOpt = new std::vector<cell>(p/2, cell(INF));
     std::vector<Info>* info = new std::vector<Info>(p/2, Info(0,p/2, 0, B.size()/p, -1, -1));
 
+    std::cout<<"Initialising Threads" << std::endl;
     for (int i = 0; i<p; i++){
         workers[i] = std::thread(thread_f, A.data(), B.data(), p,i, A.size(), B.size(), std::ref(Working),
         std::ref(working_mutexes), std::ref(update), sharingT, sharingTRev, sharingOpt, std::ref(*info), std::ref(results[i]));
     }
     int TotalScore = 0;
     alignment FinalAlignment;
+    std::cout<<"Joining Threads" << std::endl;
+
     for (int i = 0; i < p; i++){
         workers[i].join();
         TotalScore += results[i].score;
