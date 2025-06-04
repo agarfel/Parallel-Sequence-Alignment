@@ -152,7 +152,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<cell>>* sharingT,
     std::vector<std::vector<cell>>* sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
-    // if (id== 0){std::cout<<"Initialising Values - Thread "<< id << std::endl;}
 
     int num_blocks = p / 2;
     int B_len;
@@ -171,34 +170,11 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     int row_k2 = info[id].bottom_row; // index of last row (in group)
     int s = info[id].s;
     int e = info[id].e;
-    if(id==0){
-    std::cout << "THREAD " << id << "\n"
-            << "num_cols: " << num_cols << "\n"
-            << "p: " << p << "\n"
-            << "col_k1: " << col_k1 << "\n"
-            << "col_k2: " << col_k2 << "\n"
-            << "row_k1: " << row_k1 << "\n"
-            << "row_k2: " << row_k2 << "\n"
-            << "s: " << s << "\n"
-            << "e: " << e << std::endl;}
 
     // Decomposing
-    while (((col_k1 + 1 != col_k2) && (row_k1 +1 != row_k2)) && p > 2){
-        std::cout<<"Start Decomposing - Thread  "<< id << std::endl;
-            std::cout << "THREAD " << id << "\n"
-            << "num_cols: " << num_cols << "\n"
-            << "p: " << p << "\n"
-            << "col_k1: " << col_k1 << "\n"
-            << "col_k2: " << col_k2 << "\n"
-            << "row_k1: " << row_k1 << "\n"
-            << "row_k2: " << row_k2 << "\n"
-            << "s: " << s << "\n"
-            << "e: " << e << std::endl;
-
+    while (((col_k2 - col_k1 > 1) && (row_k1 +1 != row_k2)) && p > 2){
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
-
-
 
         // Initialize curr and prev
         std::vector<cell> T1_curr(num_cols + 1);
@@ -209,8 +185,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         std::vector<cell> T2_prev(num_cols + 1, INF);
         std::vector<cell> T3_prev(num_cols + 1, INF);
 
-        // if(id == 0){std::cout<<"Computing T and TRev - Thread  "<< id << std::endl;}
-
         if(id % 2 == 0){
 
             // Copy Section of A we want
@@ -220,7 +194,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
             
             int m = num_cols; // amount of columns per thread
-
+            if (id == 2*col_k2){
+                m += info[id].plus;
+            }
             // INITIALIZE T_prev for all threads:
             for (int j = 0; j < num_cols; j++){          
                     if (!((s == 1) || (s == 3))){ T2_prev[j].value = -h-g*(j + 1);}
@@ -228,7 +204,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             }
 
             if(ishead){
-                // [i'-1, j'-1]
                 if (s == -1){ T1_prev[0].value = 0; }
                 if (s == -2){ T2_prev[0].value = 0;}
                 if (s == -3){ T3_prev[0].value = 0;}
@@ -237,7 +212,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             for (int i = 0; i < num_rows; i++){ // COMPUTE ALL ROWS
                 // Get T_curr[0]:
                 if (ishead){
-                    //  std::cout<<"Setting T_curr[0] - Thread  "<< id << std::endl;
                     T1_curr[0].value = INF; // NEEDED?
                     T2_curr[0].value = INF; // NEEDED?
                     T3_curr[0].value = INF;
@@ -249,12 +223,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     T2_curr[0].origin_type = 2;
                     T3_curr[0].origin_row = i;
                     T3_curr[0].origin_type = 3;
-                    // std::cout<<"Set T_curr[0] - Thread  "<< id << std::endl;
                 } else {
-                    // if (id == 5){std::cout<<"Getting T_curr[0] - Thread  "<< id << std::endl;}
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id]);
-                        // std::cout<<"WORKING:  "<< working[0] << working[1] << working[2] << working[3] << std::endl;
 
                         while (working[id] != 2){
 
@@ -267,9 +238,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         working[id] = 1;
                     }
                     update.notify_all();
-                    // if (id == 5){std::cout<<"Got T_curr[0] - Thread  "<< id << std::endl;}
                 }
-                // std::cout<<"Computing T_curr - Thread  "<< id << std::endl;
                 // Compute T_curr:
                 for(int j = 1; j<m; j++){
                     // T1
@@ -335,19 +304,14 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         T3_curr[1].origin_type = 3;
                     }
                 }
-                // std::cout<<"Computed T_curr - Thread  "<< id << std::endl;
-
                 // Share last value:
                 if (id != col_k2*2){ // Not last row
-                    // if (id == 5) {std::cout<<"Sharing T_curr[-1] - Thread  "<< id << std::endl;}
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id+2]);
-                        // std::cout<<"Waiting for next block to read - Thread  "<< id << std::endl;
 
                         while (working[id+2] != 1){
                             update.wait(lock);
                         }
-                        // std::cout<<"updating Shared - Thread  "<< id << std::endl;
 
                         (*sharingT)[0][id+2] = T1_curr[0];
                         (*sharingT)[1][id+2] = T2_curr[0];
@@ -355,7 +319,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         working[id+2] = 2;
                     }
                     update.notify_all();
-                    // if (id == 5) {std::cout<<"Finished Sharing - Thread  "<< id << std::endl;}
 
                 }
 
@@ -364,15 +327,12 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 std::swap(T3_prev, T3_curr);
 
             }
-            // std::cout<<"Computed T - Thread  "<< id << std::endl;
 
             // Wait until TRev Computed for this set of columns
             std::unique_lock<std::mutex> lock(working_mutexes[id+1]);
             while (working[id+1] != 4){
                 update.wait(lock);
             }
-            // std::cout<<"Computing Local OPT - Thread  "<< id << std::endl;
-
             // Copmute opt
             cell max_opt(INF);
             int start = p * id * 2;
@@ -433,10 +393,12 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             int num_rows = (row_k2 - row_midk);
             std::vector<char> A(num_rows);
             std::memcpy(A.data(), A_ptr + row_midk, num_rows);
-            // std::cout<<"Computing TRev - Thread  "<< id << std::endl;
 
             // Compute TRev
             int m = num_cols; // amount of columns per thread
+            if (id == 2*col_k2 +1){
+                m += info[id].plus;
+            }
 
             // INITIALIZE T_prev for all threads:
             for (int j = num_cols -1; j >= 0; j--){          
@@ -445,7 +407,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             }
 
             if(id == (2*col_k2)+1){ // Is "sub-head"
-                // [i'-1, j'-1]
                 if (s == -1){ T1_prev[0].value = 0; }
                 if (s == -2){ T2_prev[0].value = 0;}
                 if (s == -3){ T3_prev[0].value = 0;}
@@ -456,7 +417,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 // Get TRev_curr[0]:
 
                 if (id == (col_k2*2)+1){ // Rev Head
-                    // std::cout<<"RevHead setting TRev_curr[0] - Thread  "<< id << std::endl;
 
                     T1_curr[num_cols -1].value = INF; // NEEDED?
                     T2_curr[num_cols -1].value = INF; // NEEDED?
@@ -470,9 +430,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     T3_curr[num_cols -1].r_row = i;
                     T3_curr[num_cols -1].r_type = 3;
                 } else {
-                    // std::cout<<"Getting TRev_curr[-1] - Thread  "<< id << std::endl;
-                    // if (id == 5) {std::cout<<"Getting TRev_curr[0] - Thread  "<< id << std::endl;}
-
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id]);
                         while (working[id] != 2){
@@ -485,13 +442,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         working[id] = 1;
                     }
                     update.notify_all();
-                    // std::cout<<"Got TRev_curr[-1] - Thread  "<< id << std::endl;
-                    // if (id == 5) {std::cout<<"Got TRev_curr[0] - Thread  "<< id << std::endl;}
-
                 }
 
                 // Compute T_curr:
-                // if (id == 5){std::cout<<"Computing TRev_curr - Thread  "<< id << std::endl;}
                 for (int j = num_cols -1; j >= 0; j--){
                     // T1
                     if ((T1_prev[j+1].value >= T2_prev[j+1].value) && (T1_prev[j+1].value >= T3_prev[j+1].value)){
@@ -560,8 +513,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
                 // Share last value:
                 if (id != col_k1*2+1){ // Not last row
-                    // std::cout<<"Sharing TRev_curr[0] - Thread  "<< id << std::endl;
-                    // if (id == 5) {std::cout<<"Sharing TRev_curr[0] - Thread  "<< id << std::endl;}
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id-2]);
                         while (working[id-2] != 1){
@@ -570,31 +521,24 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         (*sharingT)[0][id-2] = T1_curr[0];
                         (*sharingT)[1][id-2] = T2_curr[0];
                         (*sharingT)[2][id-2] = T3_curr[0];
-                        // std::cout<<"Setting Working "<< id -2<<  " To 2 - THREAD "<< id << std::endl;
 
                         working[id-2] = 2;
                     }
                     update.notify_all();
-                    // if (id == 5) {std::cout<<"Finished Sharing TRev_curr[0] - Thread  "<< id << std::endl;}
 
                 }
-                // std::cout<<"Computed TREV_curr " << i << " - Thread  "<< id << std::endl;
                 std::swap(T1_prev, T1_curr);
                 std::swap(T2_prev, T2_curr);
                 std::swap(T3_prev, T3_curr);
 
             }
-            // std::cout<<"Computed TRev - Thread  "<< id << std::endl;
 
         }
         {
             std::lock_guard<std::mutex> lock(working_mutexes[id]);
             working[id] = 4;
         }
-        // std::cout<<"Synchronising - Thread  "<< id << std::endl;
-
         update.notify_all();
-
 
         // SYNCHRONISATION POINT: all partial opt's are computed
         if (ishead){    // Current thread is Head
@@ -602,10 +546,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 std::unique_lock<std::mutex> lock(working_mutexes[id]);
                 while (*std::min_element(working.begin() + col_k1*2, working.begin() + col_k2*2+1) != 4) {
                     update.wait(lock);
-        }
+                }
             }
-            // std::cout<<"Computing Global OPT - Thread  "<< id << std::endl;
-
             // Get Max OPT
             cell max_opt(INF);
             int leftmost_col;
@@ -616,47 +558,31 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     leftmost_col = j;
                 }
             }
-            // std::cout<<"Splitting Problem - Thread  "<< id << std::endl;
-
             // SPLIT PROBLEM
             int r1 = max_opt.origin_row  + row_k1;
-            int r2 = max_opt.r_row + row_k1; // rows where we split the problem [get using next and prev]
+            int r2 = max_opt.r_row + row_midk; // rows where we split the problem [get using next and prev]
             int t1 = max_opt.origin_type;
             int t2 = max_opt.r_type; // types where we split the problem
 
-            // std::cout<<"Initialised vars - Thread  "<< id << std::endl;
-
-            for (int thread_id = col_k1; thread_id < leftmost_col + 1; thread_id++){
-                info[thread_id] = Info(col_k1, leftmost_col, row_k1, r1, s, t1);
+            for (int thread_id = 2*col_k1; thread_id < 2*leftmost_col; thread_id++){
+                info[thread_id] = Info(col_k1, leftmost_col-1, row_k1, r1, s, t1,1);
             }
-            for (int thread_id = leftmost_col +1 ; thread_id < col_k2 + 1; thread_id++){
-                info[thread_id] = Info(leftmost_col + 1,col_k2, r2, row_k2, t2, e);
+            for (int thread_id = 2*leftmost_col +2 ; thread_id < 2*col_k2 + 3; thread_id++){
+                info[thread_id] = Info(leftmost_col +1,col_k2, r2, row_k2, t2, e,0);
             }
-            info[leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2);
-            info[leftmost_col+1] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2);
-
-            // std::cout<<"Set new info - Thread  "<< id << std::endl;
-            // std::cout<<"Current Working:  "<< working[0] <<working[1] <<working[2] <<working[3] <<working[4] <<working[5] << std::endl;
-            // std::this_thread::sleep_for(std::chrono::seconds(1));
+            info[leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
+            info[leftmost_col+1] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
 
             for (int k = col_k1; k < col_k2+1; k++){
-                // std::cout<<"Setting Working  "<< 2*k+1 <<" to 1" << std::endl;
-
                 {
                     std::lock_guard<std::mutex> lock(working_mutexes[2*k+1]);
                     working[2*k+1] = 1;
                 }
-                // std::cout<<"Setting Working  "<< 2*k <<" to 1" << std::endl;
-
                 {
                     std::lock_guard<std::mutex> lock(working_mutexes[2*k]);
                     working[2*k] = 1;
                 }
-                // std::cout<<"Success" << std::endl;
-
             }
-            // std::cout<<"Notify - Thread  "<< id << std::endl;
-
             update.notify_all();
         } else {
             std::unique_lock<std::mutex> lock(working_mutexes[id]);
@@ -664,8 +590,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 update.wait(lock);
             }
         }
-        std::cout<<"Updating Data - Thread  "<< id << std::endl;
-
         // UPDATE DATA:
         col_k1 = info[id].first; // index of first special column (in group)
         col_k2 = info[id].last; // index of last special column (in group)
@@ -674,29 +598,12 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         s = info[id].s;
         e = info[id].e;
 
-        std::cout << "UPDATED INFO - Continuing Decomposition " << std::endl;
-
     }
-    std::cout << "Solving Sub-problem - Thread " << id << std::endl;
-    std::cout << "THREAD " << id << "\n"
-            << "num_cols: " << num_cols << "\n"
-            << "p: " << p << "\n"
-            << "col_k1: " << col_k1 << "\n"
-            << "col_k2: " << col_k2 << "\n"
-            << "row_k1: " << row_k1 << "\n"
-            << "row_k2: " << row_k2 << "\n"
-            << "s: " << s << "\n"
-            << "e: " << e << std::endl;
-
-    if (id%2 == 1){ // Even threads solve subproblem
-
+    
+    if ((id%2 == 1)||((!(2*col_k1 == id)) || (row_k2-row_k1 < 0))){
         return;
     }
-    // std::cout<<"Solving Subproblem - Thread "<< id << std::endl;
 
-    if (!(2*col_k1 == id)){
-        return;
-    }
     B_len = 0;
     if (col_k1 +1 == col_k2){B_len = m/num_blocks;}
     // SOLVE SUBPROBLEM
@@ -705,10 +612,10 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     } else {
         B_len += m/num_blocks;
     }
+    B_len += info[id].plus;
     std::vector<char> B2(B_ptr, B_ptr + B_len); // Copy B part
 
     int num_rows = (row_k2 - row_k1);
-    // std::cout << "Thread ID: " << id << " Row k1 " << row_k1 << " Row k2 " << row_k2 << num_rows << std::endl;
     std::vector<char> A(num_rows);
     std::memcpy(A.data(), A_ptr + row_k1, num_rows);
 
@@ -717,10 +624,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     sub_problem.B = B2;
     sub_problem.s = s;
     sub_problem.e = e;
-    // std::cout << "THREAD: " << id << " Cols in problem: " << B2.size() << " Rows in problem: "<< num_rows << std::endl;
-    result = solve_subproblem(sub_problem, col_k1*(m/p), row_k1);
-    // std::cout << "Done - Thread " << id << std::endl;
 
+    result = solve_subproblem(sub_problem, col_k1*(m/p), row_k1);
 }
 
 void output_alignement(alignment alignment, str A, str B){
@@ -769,9 +674,8 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     std::vector<std::vector<cell>>* sharingT = new std::vector<std::vector<cell>>(3, std::vector<cell>(p));
     std::vector<std::vector<cell>>* sharingTRev = new std::vector<std::vector<cell>>(3, std::vector<cell>(B.size()));
     std::vector<cell>* sharingOpt = new std::vector<cell>(p/2, cell(INF));
-    std::vector<Info>* info = new std::vector<Info>(p, Info(0,p/2 -1, 0, A.size(), -1, -1));
+    std::vector<Info>* info = new std::vector<Info>(p, Info(0,p/2 -1, 0, A.size(), -1, -1,0));
 
-    // std::cout<<"Initialising Threads" << std::endl;
     for (int i = 0; i<p; i++){
         workers[i] = std::thread(thread_f, A.data(), B.data(), p,i, A.size(), B.size(), std::ref(Working),
         std::ref(working_mutexes), std::ref(update), sharingT, sharingTRev, sharingOpt, std::ref(*info), std::ref(results[i]));
@@ -798,8 +702,8 @@ int run(std::vector<char> A, std::vector<char> B, int p){
 int main(){
     std::vector<char> A = readFastaSequence("sequences/insulin_bovin.fasta");
     std::vector<char> B = readFastaSequence("sequences/insulin_homo.fasta");
-    std::cout << "Length A: " << A.size() << "\n"
-             << "Length B: " << B.size() << std::endl;
+    std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
+              << "B: " << std::string(B.begin(), B.end()) << std::endl;
     // std::cout << "2 Threads" << std::endl;
     // run(A, B, 2);
     // std::cout << "4 Threads" << std::endl;

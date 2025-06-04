@@ -8,7 +8,7 @@
 typedef std::vector<char> str;
 typedef std::pair<int, int> pair;
 
-int INF = std::numeric_limits<int>::min();
+int INF = -100000;
 int SUP = std::numeric_limits<int>::max();
 
 const int gap_creation_penalty = 2; // h
@@ -69,15 +69,16 @@ public:
 
 class Info{
 public:
-    Info(int f, int l, int t, int b, int st, int et) {
+    Info(int f, int l, int t, int b, int st, int et, int p) {
         first = f;
         last = l;
         top_row = t;
         bottom_row = b;
         s = st;
         e = et;
+        plus = p;
     }
-    int first, last, top_row, bottom_row, s, e;
+    int first, last, top_row, bottom_row, s, e, plus;
 };
 
 
