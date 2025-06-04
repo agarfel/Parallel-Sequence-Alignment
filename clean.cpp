@@ -144,7 +144,7 @@ result solve_subproblem(extended_P sub_problem){ // one or two sub_problems
     //recurrence relation
     for(int i = 1; i < n+1; i++){
         for(int j = 1; j < m+1; j++){
-            int T1_best = std::max({T1[i-1][j-1].value, T2[i-1][j-1].value, T3[i-1][j-1].value});
+            int T1_best = std::max({T1[i-1][j-1], T2[i-1][j-1], T3[i-1][j-1]});
             T1[i][j] = f(A[i-1], B[j-1]) + T1_best;
             BT1[i][j] = from(T1_best, T1[i-1][j-1], T2[i-1][j-1], T3[i-1][j-1]);
             int T2_best = std::max({(T1[i][j-1] -(g+h)), (T2[i][j-1] - g), (T3[i][j-1] -(g+h))});
@@ -161,7 +161,7 @@ result solve_subproblem(extended_P sub_problem){ // one or two sub_problems
         else if (end_type == 2) {res.score = T2[n][m];}
         else {res.score = T3[n][m];}
     } else {
-        res.score = max({ T1[n][m], T2[n][m], T3[n][m] });
+        res.score = std::max({ T1[n][m], T2[n][m], T3[n][m] });
     }
 
     /* doing the traceback */
@@ -175,12 +175,12 @@ result solve_subproblem(extended_P sub_problem){ // one or two sub_problems
             i--; j--;
             state = bt;
         } else if (state == 2) { // T2
-            res.alignement.data.push_back({-1, j-1});
+            res.alignment.data.push_back({-1, j-1});
             int bt = BT2[i][j];
             j--;
             state = bt;
         } else if (state == 3) { // T3
-            res.alignement.data.push_back({i-1, -1});
+            res.alignment.data.push_back({i-1, -1});
             int bt = BT3[i][j];
             i--;
             state = bt;

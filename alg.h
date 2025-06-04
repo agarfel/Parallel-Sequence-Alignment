@@ -38,6 +38,7 @@ in A0 and B0 to model the alignment, as opposed to
 using their positions relative to the substrings*/
 
 class alignment {
+public:
     std::vector<std::pair<int, int>> data;  // (i,j) i index in A, j index in B (start with i=0 ; -1 ==> Gap)
 
     alignment(){}
@@ -53,7 +54,9 @@ class alignment {
         }
     }
 };
+
 class result{
+public:
     int Score;
     alignment alignment;
 
