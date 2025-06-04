@@ -78,7 +78,7 @@ class Matrix {
 public:
 
     int n, m;
-    struct cell** data;
+    int** data;
 
     Matrix(){}
 
@@ -86,9 +86,9 @@ public:
         this->n = n;
         this->m = m;
 
-        data = new cell*[n];
+        data = new int*[n];
         for(int i = 0; i<n; i++){
-            data[i] = new cell[m];
+            data[i] = new int[m];
         }
     }
 
@@ -96,7 +96,7 @@ public:
         delete[] data;
     }
 
-    cell* operator[](int i){
+    int* operator[](int i){
         return data[i];
     }
 };  
