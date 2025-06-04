@@ -170,16 +170,16 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     int row_k2 = info[id].bottom_row; // index of last row (in group)
     int s = info[id].s;
     int e = info[id].e;
-
-    // std::cout << "THREAD " << id << "\n"
-    //         << "num_cols: " << num_cols << "\n"
-    //         << "p: " << p << "\n"
-    //         << "col_k1: " << col_k1 << "\n"
-    //         << "col_k2: " << col_k2 << "\n"
-    //         << "row_k1: " << row_k1 << "\n"
-    //         << "row_k2: " << row_k2 << "\n"
-    //         << "s: " << s << "\n"
-    //         << "e: " << e << std::endl;
+    if(id==0){
+    std::cout << "THREAD " << id << "\n"
+            << "num_cols: " << num_cols << "\n"
+            << "p: " << p << "\n"
+            << "col_k1: " << col_k1 << "\n"
+            << "col_k2: " << col_k2 << "\n"
+            << "row_k1: " << row_k1 << "\n"
+            << "row_k2: " << row_k2 << "\n"
+            << "s: " << s << "\n"
+            << "e: " << e << std::endl;}
 
     // Decomposing
     while (((col_k1 + 1 != col_k2) && (row_k1 +1 != row_k2)) && p > 2){
@@ -241,7 +241,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     T3_curr[0].origin_type = 3;
                     // std::cout<<"Set T_curr[0] - Thread  "<< id << std::endl;
                 } else {
-                    // std::cout<<"Getting T_curr[0] - Thread  "<< id << std::endl;
+                    // if (id == 5){std::cout<<"Getting T_curr[0] - Thread  "<< id << std::endl;}
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id]);
                         // std::cout<<"WORKING:  "<< working[0] << working[1] << working[2] << working[3] << std::endl;
@@ -257,7 +257,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         working[id] = 1;
                     }
                     update.notify_all();
-                    // std::cout<<"Got T_curr[0] - Thread  "<< id << std::endl;
+                    // if (id == 5){std::cout<<"Got T_curr[0] - Thread  "<< id << std::endl;}
                 }
                 // std::cout<<"Computing T_curr - Thread  "<< id << std::endl;
                 // Compute T_curr:
@@ -329,7 +329,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
                 // Share last value:
                 if (id != col_k2*2){ // Not last row
-                    // std::cout<<"Sharing T_curr[-1] - Thread  "<< id << std::endl;
+                    // if (id == 5) {std::cout<<"Sharing T_curr[-1] - Thread  "<< id << std::endl;}
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id+2]);
                         // std::cout<<"Waiting for next block to read - Thread  "<< id << std::endl;
@@ -345,7 +345,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         working[id+2] = 2;
                     }
                     update.notify_all();
-                    // std::cout<<"Finished Sharing - Thread  "<< id << std::endl;
+                    // if (id == 5) {std::cout<<"Finished Sharing - Thread  "<< id << std::endl;}
 
                 }
 
@@ -354,6 +354,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 std::swap(T3_prev, T3_curr);
 
             }
+            std::cout<<"Computed T - Thread  "<< id << std::endl;
 
             // Wait until TRev Computed for this set of columns
             std::unique_lock<std::mutex> lock(working_mutexes[id+1]);
@@ -433,7 +434,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     if (e == -2){T2_prev[j].value += h;}
             }
 
-            if(id == col_k2+1){ // Is "sub-head"
+            if(id == (2*col_k2)+1){ // Is "sub-head"
                 // [i'-1, j'-1]
                 if (s == -1){ T1_prev[0].value = 0; }
                 if (s == -2){ T2_prev[0].value = 0;}
@@ -443,7 +444,10 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
             for (int i = num_rows -1; i >= 0; i--){ // COMPUTE ALL ROWS
                 // Get TRev_curr[0]:
-                if (id == col_k2*2-1){
+
+                if (id == (col_k2*2)+1){ // Rev Head
+                    // std::cout<<"RevHead setting TRev_curr[0] - Thread  "<< id << std::endl;
+
                     T1_curr[num_cols -1].value = INF; // NEEDED?
                     T2_curr[num_cols -1].value = INF; // NEEDED?
                     T3_curr[num_cols -1].value = INF;
@@ -457,6 +461,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     T3_curr[num_cols -1].r_type = 3;
                 } else {
                     // std::cout<<"Getting TRev_curr[-1] - Thread  "<< id << std::endl;
+                    // if (id == 5) {std::cout<<"Getting TRev_curr[0] - Thread  "<< id << std::endl;}
 
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id]);
@@ -466,16 +471,17 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         T1_curr[0] = (*sharingT)[0][id];
                         T2_curr[0] = (*sharingT)[1][id];
                         T3_curr[0] = (*sharingT)[2][id];
-                    
+
                         working[id] = 1;
                     }
                     update.notify_all();
                     // std::cout<<"Got TRev_curr[-1] - Thread  "<< id << std::endl;
+                    // if (id == 5) {std::cout<<"Got TRev_curr[0] - Thread  "<< id << std::endl;}
 
                 }
 
                 // Compute T_curr:
-                // std::cout<<"Computing TRev_curr - Thread  "<< id << std::endl;
+                // if (id == 5){std::cout<<"Computing TRev_curr - Thread  "<< id << std::endl;}
                 for (int j = num_cols -1; j >= 0; j--){
                     // T1
                     if ((T1_prev[j+1].value >= T2_prev[j+1].value) && (T1_prev[j+1].value >= T3_prev[j+1].value)){
@@ -543,9 +549,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 }
 
                 // Share last value:
-                if (id != col_k1+1){ // Not last row
+                if (id != col_k1*2+1){ // Not last row
                     // std::cout<<"Sharing TRev_curr[0] - Thread  "<< id << std::endl;
-
+                    // if (id == 5) {std::cout<<"Sharing TRev_curr[0] - Thread  "<< id << std::endl;}
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id-2]);
                         while (working[id-2] != 1){
@@ -554,21 +560,23 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         (*sharingT)[0][id-2] = T1_curr[0];
                         (*sharingT)[1][id-2] = T2_curr[0];
                         (*sharingT)[2][id-2] = T3_curr[0];
+                        // std::cout<<"Setting Working "<< id -2<<  " To 2 - THREAD "<< id << std::endl;
 
                         working[id-2] = 2;
                     }
                     update.notify_all();
-                    // std::cout<<"Finished Sharing TRev_curr[0] - Thread  "<< id << std::endl;
+                    // if (id == 5) {std::cout<<"Finished Sharing TRev_curr[0] - Thread  "<< id << std::endl;}
 
                 }
-                // std::cout<<"Computed T_curr - Thread  "<< id << std::endl;
+                // std::cout<<"Computed TREV_curr " << i << " - Thread  "<< id << std::endl;
                 std::swap(T1_prev, T1_curr);
                 std::swap(T2_prev, T2_curr);
                 std::swap(T3_prev, T3_curr);
 
             }
-        }
+            // std::cout<<"Computed TRev - Thread  "<< id << std::endl;
 
+        }
         {
             std::lock_guard<std::mutex> lock(working_mutexes[id]);
             working[id] = 4;
@@ -604,6 +612,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             int t1 = max_opt.origin_type;
             int t2 = max_opt.r_type; // types where we split the problem
 
+            std::cout<<"Initialised vars - Thread  "<< id << std::endl;
+
             for (int thread_id = col_k1; thread_id < leftmost_col + 1; thread_id++){
                 info[thread_id] = Info(col_k1, leftmost_col, row_k1, r1, s, t1);
             }
@@ -613,16 +623,21 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             info[leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2);
             info[leftmost_col+1] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2);
 
+            std::cout<<"Set new info - Thread  "<< id << std::endl;
+            std::cout<<"Current Working:  "<< working[0] <<working[1] <<working[2] <<working[3] <<working[4] <<working[5] << std::endl;
+
             for (int k = col_k1; k < col_k2+1; k++){
                 {
-                    std::lock_guard<std::mutex> lock(working_mutexes[2*col_k1]);
-                    working[2*col_k1] = 1;
+                    std::lock_guard<std::mutex> lock(working_mutexes[2*k]);
+                    working[2*k] = 1;
                 }
                 {
-                    std::lock_guard<std::mutex> lock(working_mutexes[2*col_k1+1]);
-                    working[2*col_k1+1] = 1;
+                    std::lock_guard<std::mutex> lock(working_mutexes[2*k+1]);
+                    working[2*k+1] = 1;
                 }
             }
+            std::cout<<"Notify - Thread  "<< id << std::endl;
+
             update.notify_all();
         } else {
             std::unique_lock<std::mutex> lock(working_mutexes[id+2]);
