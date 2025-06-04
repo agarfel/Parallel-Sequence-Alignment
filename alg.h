@@ -2,7 +2,6 @@
 #include <initializer_list>
 #include <vector>
 #include <limits>
-#include "read_fasta.cpp"
 #include <condition_variable>
 #include <cmath>
 
@@ -26,11 +25,11 @@ struct extended_P {
 
 class cell{
 public:
-    cell(int v, int n, int p){value = v; next = n; prev = p;}
-    int value;
-    int next, prev;
+    cell(int v){
+        value = v;
+    }
+    int value, origin_type, origin_row, r_type, r_row;
 };
-
 /*
 When aligning substrings of A0 and B0 ,
 we still use original positions of characters
@@ -42,6 +41,11 @@ public:
     std::vector<std::pair<int, int>> data;  // (i,j) i index in A, j index in B (start with i=0 ; -1 ==> Gap)
 
     alignment(){}
+
+    alignment& operator+=(const alignment& other) {
+        data.insert(data.end(), other.data.begin(), other.data.end());
+        return *this;
+    }
 
     int type(int k){
         if (k >= data.size()){return -1;}
@@ -57,11 +61,12 @@ public:
 
 class result{
 public:
-    int Score;
-    alignment alignment;
+    int score;
+    alignment al;
 
     result(){}
 };
+
 
 class Info{
 public:
@@ -104,13 +109,6 @@ public:
     }
 };  
 
-int a_type(std::pair<int,int>);
-int sc(alignment, extended_P);
-int escs(alignment, extended_P);
-int esce(alignment, extended_P);
-int esc(alignment, extended_P);
-
-void thread_f(str B, str* A, int first, int last);
 
 /*
 Working values:
