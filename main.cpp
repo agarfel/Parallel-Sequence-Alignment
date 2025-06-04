@@ -151,7 +151,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<cell>>* sharingT,
     std::vector<std::vector<cell>>* sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
-    std::cout<<"Initialising Values - Thread "<< id << std::endl;
+    if (id== 0){std::cout<<"Initialising Values - Thread "<< id << std::endl;}
 
     int num_blocks = p / 2;
     int B_len;
@@ -172,11 +172,19 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     int s = info[id].s;
     int e = info[id].e;
 
-
+    // std::cout << "THREAD " << id << "\n"
+    //         << "num_cols: " << num_cols << "\n"
+    //         << "num_special_rows: " << num_special_rows << "\n"
+    //         << "col_k1: " << col_k1 << "\n"
+    //         << "col_k2: " << col_k2 << "\n"
+    //         << "row_k1: " << row_k1 << "\n"
+    //         << "row_k2: " << row_k2 << "\n"
+    //         << "s: " << s << "\n"
+    //         << "e: " << e << std::endl;
 
     // Decomposing
     while (((col_k1 + 1 != col_k2) && (row_k1 +1 != row_k2)) && p > 2){
-        std::cout<<"Start Decomposing - Thread  "<< id << std::endl;
+        if (id == 0){std::cout<<"Start Decomposing - Thread  "<< id << std::endl;}
 
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
@@ -194,6 +202,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         std::vector<cell> T1_prev(num_cols + 1, INF);
         std::vector<cell> T2_prev(num_cols + 1, INF);
         std::vector<cell> T3_prev(num_cols + 1, INF);
+
+        if(id == 0){std::cout<<"Computing T and TRev - Thread  "<< id << std::endl;}
 
         if(id % 2 == 0){
             int m = num_cols; // amount of columns per thread
@@ -214,6 +224,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             for (int i = 0; i < num_rows; i++){ // COMPUTE ALL ROWS
                 // Get T_curr[0]:
                 if (ishead){
+                     std::cout<<"Setting T_curr[0] - Thread  "<< id << std::endl;
                     T1_curr[0].value = INF; // NEEDED?
                     T2_curr[0].value = INF; // NEEDED?
                     T3_curr[0].value = INF;
@@ -225,7 +236,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     T2_curr[0].origin_type = 2;
                     T3_curr[0].origin_row = i;
                     T3_curr[0].origin_type = 3;
+                     std::cout<<"Set T_curr[0] - Thread  "<< id << std::endl;
                 } else {
+                    std::cout<<"Getting T_curr[0] - Thread  "<< id << std::endl;
                     std::unique_lock<std::mutex> lock(working_mutexes[id]);
                     while (working[id] != 2){
                         update.wait(lock);
@@ -238,8 +251,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                         working[id] = 1;
                     }
                     update.notify_all();
+                    std::cout<<"Got T_curr[0] - Thread  "<< id << std::endl;
                 }
-
+                 std::cout<<"Computing T_curr - Thread  "<< id << std::endl;
                 // Compute T_curr:
                 for(int j = 1; j<m; j++){
                     // T1
@@ -333,6 +347,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             while (working[id+1] != 4){
                 update.wait(lock);
             }
+            std::cout<<"Computing Local OPT - Thread  "<< id << std::endl;
 
             // Copmute opt
             cell max_opt(INF);
@@ -532,6 +547,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         }
         update.notify_all();
 
+        std::cout<<"Synchronising - Thread  "<< id << std::endl;
 
         // SYNCHRONISATION POINT: all partial opt's are computed
         if (ishead){    // Current thread is Head
@@ -539,6 +555,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             while (*std::min_element(working.begin() + col_k1*2, working.begin() + col_k2*2) != 4) {
                 update.wait(lock);
             }
+            std::cout<<"Computing Global OPT - Thread  "<< id << std::endl;
 
             // Get Max OPT
             cell max_opt(INF);
@@ -550,6 +567,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     leftmost_col = j;
                 }
             }
+            std::cout<<"Splitting Problem - Thread  "<< id << std::endl;
 
             // SPLIT PROBLEM
             int r1 = max_opt.origin_row  + row_k1;
@@ -583,6 +601,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 update.wait(lock);
             }
         }
+        std::cout<<"Updating Data - Thread  "<< id << std::endl;
+
         // UPDATE DATA:
         col_k1 = info[id].first; // index of first special column (in group)
         col_k2 = info[id].last; // index of last special column (in group)
@@ -654,7 +674,7 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     std::vector<std::vector<cell>>* sharingT = new std::vector<std::vector<cell>>(3, std::vector<cell>(p));
     std::vector<std::vector<cell>>* sharingTRev = new std::vector<std::vector<cell>>(3, std::vector<cell>(B.size()));
     std::vector<cell>* sharingOpt = new std::vector<cell>(p/2, cell(INF));
-    std::vector<Info>* info = new std::vector<Info>(p/2, Info(0,p/2, 0, B.size()/p, -1, -1));
+    std::vector<Info>* info = new std::vector<Info>(p, Info(0,p/2, 0, B.size()/p, -1, -1));
 
     std::cout<<"Initialising Threads" << std::endl;
     for (int i = 0; i<p; i++){
@@ -663,20 +683,21 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     }
     int TotalScore = 0;
     alignment FinalAlignment;
-    std::cout<<"Joining Threads" << std::endl;
 
-    for (int i = 0; i < p; i++){
+    for (int i = 0; i < p/2; i+=2){
         workers[i].join();
         TotalScore += results[i].score;
         FinalAlignment += results[i].al;
     }
-
+    std::cout << TotalScore << std::endl;
     return 0;
 }
 
 int main(){
     std::vector<char> A = readFastaSequence("sequences/insulin_bovin.fasta");
     std::vector<char> B = readFastaSequence("sequences/insulin_homo.fasta");
-    run(A, B, 2);
+    std::cout << "Length A: " << A.size() << "\n"
+             << "Length B: " << B.size() << std::endl;
+    run(A, B, 4);
     return 0;
 }
