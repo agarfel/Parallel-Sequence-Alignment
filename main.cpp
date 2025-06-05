@@ -150,7 +150,7 @@ Function called by each thread.
 */
 void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m, std::vector<int>& working,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<cell>>* sharingT,
-    std::vector<std::vector<cell>> sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
+    std::vector<std::vector<cell>> &sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
 
     int num_blocks = p / 2;
@@ -349,30 +349,35 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 auto& row1 = sharingTRev[1];
                 auto& row2 = sharingTRev[2];
 
+                // std::cout << "\n start_idx " << start_idx << " Last: " << start_idx + B_len << " Row0.size() = " << row0.size() << std::endl;
+                // std::cout << "Copying thread " << id << ", start_idx = " << start_idx << ", B_len = " << B_len << "\n";
+                // std::cout << "T1_curr.size() = " << T1_curr.size() << ", sharingTRev[0].size() = " << sharingTRev[0].size() << std::endl;
+
                 int start_idx = (m / num_blocks) * (id / 2);
-                std::cout << "\n start_idx " << start_idx << " Last: " << start_idx + B_len << " Row0.size() = " << row0.size() << std::endl;
-                std::cout << "Copying thread " << id << ", start_idx = " << start_idx << ", B_len = " << B_len << "\n";
-                std::cout << "T1_curr.size() = " << T1_curr.size() << ", sharingTRev[0].size() = " << sharingTRev[0].size() << std::endl;
+                std::vector<cell> T1_Rev(B_len);
+                std::vector<cell> T2_Rev(B_len);
+                std::vector<cell> T3_Rev(B_len);
+                for(int j = 0; j<B_len; j++){
+                   T1_Rev[j] = sharingTRev[0][start_idx + j];
+                   T2_Rev[j] = sharingTRev[1][start_idx + j];
+                   T3_Rev[j] = sharingTRev[2][start_idx + j];
 
-                std::vector<cell> T1_Rev(row0.begin() + start_idx, row0.begin() + start_idx + B_len);
-                std::vector<cell> T2_Rev(row1.begin() + start_idx, row1.begin() + start_idx + B_len);
-                std::vector<cell> T3_Rev(row2.begin() + start_idx, row2.begin() + start_idx + B_len);
-
-            {
-                std::cout << "\n Thread " << id << std::endl;
-                for(int j = 0; j<B_len; j++){
-                    std::cout << T1_Rev[j].value << " ";
                 }
-                std::cout << "\n B_len = " << B_len << std::endl;
-                for(int j = 0; j<B_len; j++){
-                    std::cout <<  T2_Rev[j].value << " ";
-                }
-                std::cout << "\n start_idx = " << start_idx << std::endl;
-                for(int j = 0; j<B_len; j++){
-                    std::cout <<  T3_Rev[j].value << " ";
-                }
-                std::cout << "\n Size = " << T3_Rev.size() << std::endl;
-            }
+            // {
+            //     std::cout << "\n Thread " << id << std::endl;
+            //     for(int j = 0; j<B_len; j++){
+            //         std::cout << T1_Rev[j].value << " ";
+            //     }
+            //     std::cout << "\n B_len = " << B_len << std::endl;
+            //     for(int j = 0; j<B_len; j++){
+            //         std::cout <<  T2_Rev[j].value << " ";
+            //     }
+            //     std::cout << "\n start_idx = " << start_idx << std::endl;
+            //     for(int j = 0; j<B_len; j++){
+            //         std::cout <<  T3_Rev[j].value << " ";
+            //     }
+            //     std::cout << "\n Size = " << T3_Rev.size() << std::endl;
+            // }
             lock.unlock();
 
             std::vector<int> tmps(B_len);
@@ -415,24 +420,11 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     max_opt.r_row = r_row;
                 }
             }
-
-            // {
-            //     std::lock_guard<std::mutex> lock(working_mutexes[0]);
-
-                
-            //     std::vector<char> print_A(A_ptr + row_k1 +  max_opt.origin_row, A_ptr + row_midk + max_opt.r_row);
-            //     std::cout << "THREAD cut: " << id << "\n"
-            //         << "row_k1: " << row_k1 << "\n"
-            //         << "row_midk: " << row_midk << "\n"
-            //         << "row_k2: " << row_k2 << "\n"
-            //         << "origin_row: " << max_opt.origin_row << "\n"
-            //         << "r_row: " << max_opt.r_row << "\n"
-            //         << "A: " << std::string(print_A.begin(), print_A.end()) << "\n"
-            //         << "B: " << std::string(B.begin(), B.end()) << std::endl;
-            // }
-
             // Share opt
-            (*sharingOpt)[id/2] = max_opt;
+            {
+                std::lock_guard<std::mutex> lock(working_mutexes[0]);
+                (*sharingOpt)[id/2] = max_opt;
+            }
             {
                 std::lock_guard<std::mutex> lock(working_mutexes[id]);
                 working[id] = 4;
@@ -577,30 +569,13 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         {
             std::unique_lock<std::mutex> lk(working_mutexes[0]);
             std::lock_guard<std::mutex> lock(working_mutexes[id]);
-
             int start_idx = (m / num_blocks) * (id / 2);
-            std::copy(T1_curr.begin(), T1_curr.begin() + B_len, sharingTRev[0].begin() + start_idx);
-            std::copy(T2_curr.begin(), T2_curr.begin() + B_len, sharingTRev[1].begin() + start_idx);
-            std::copy(T3_curr.begin(), T3_curr.begin() + B_len, sharingTRev[2].begin() + start_idx);
-            // std::cout<< "Size of T_Rev = "<< (*sharingTRev)[2].size()<< std::endl;
-            // std::cout<< "start_idx = "<< start_idx << std::endl;
-            // std::cout<< "B_len + start_idx = "<< B_len + start_idx << std::endl;
+            for(int j = 0; j<B_len; j++){
+                   sharingTRev[0][start_idx + j] = T1_curr[j];
+                   sharingTRev[1][start_idx + j] = T2_curr[j];
+                   sharingTRev[2][start_idx + j] = T3_curr[j];
 
-                {
-                std::cout << "\n T_curr: Thread " << id << std::endl;
-                for(int j = 0; j<B_len; j++){
-                    std::cout << T1_curr[j].value << " ";
                 }
-                std::cout << "\n B_len = " << B_len << std::endl;
-                for(int j = 0; j<B_len; j++){
-                    std::cout <<  T2_curr[j].value << " ";
-                }
-                std::cout << "\n start_idx = " << start_idx << std::endl;
-                for(int j = 0; j<B_len; j++){
-                    std::cout <<  T3_curr[j].value << " ";
-                }
-                std::cout << "\n Size = " << T3_curr.size() << std::endl;
-            }
             working[id] = 4;
         }
         update.notify_all();
@@ -625,16 +600,37 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     leftmost_col = j;
                 }
             }
+            // {
+            //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
+            //     std::cout<< "OPT VALUES: " << std::endl;
+            //     for (int j= 0; j<num_blocks; j++){
+            //         std::cout<<(*sharingOpt)[j].value << " ";
+            //     }
+            // }
             // SPLIT PROBLEM
+
             int r1 = max_opt.origin_row  + row_k1;
             int r2 = max_opt.r_row + row_midk; // rows where we split the problem [get using next and prev]
             int t1 = max_opt.origin_type;
             int t2 = max_opt.r_type; // types where we split the problem
-
+            {
+                std::lock_guard<std::mutex> lk(working_mutexes[0]);
+                std::cout<< "Splitting Problem: " << "\n"
+                << "r1: " << r1 <<"\n"
+                << "r2: " << r2 <<"\n"
+                << "row_midk: " << row_midk <<"\n"
+                << "max_opt.r_row: " << max_opt.r_row <<"\n"
+                << "t1: " << t1 <<"\n"
+                << "t2: " << t1 <<"\n"
+                << "row_k1: " << row_k1 <<"\n"
+                << "row_k2: " << row_k2 <<"\n"
+                << "Leftmost: " << leftmost_col <<"\n"
+                << std::endl;
+            }
             for (int thread_id = 2*col_k1; thread_id < 2*leftmost_col; thread_id++){
                 info[thread_id] = Info(col_k1, leftmost_col-1, row_k1, r1, s, t1,1);
             }
-            for (int thread_id = 2*leftmost_col +2 ; thread_id < 2*col_k2 + 3; thread_id++){
+            for (int thread_id = 2*leftmost_col +2 ; thread_id < 2*col_k2 + 2; thread_id++){
                 info[thread_id] = Info(leftmost_col +1,col_k2, r2, row_k2, t2, e,0);
             }
             info[leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
