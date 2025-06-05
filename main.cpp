@@ -38,7 +38,7 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
     int m = B.size();
     Matrix T1(n+1,m+1), T2(n+1,m+1), T3(n+1,m+1);
     Matrix BT1(n+1,m+1), BT2(n+1,m+1), BT3(n+1,m+1);
-
+    if(col_offset!=0){std::cout << 1 << std::endl;}
     // Initialize all cells to -1
     for (int i = 0; i <= n; ++i) {
         for (int j = 0; j <= m; ++j) {
@@ -47,6 +47,8 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
             T3[i][j] = -1;
         }
     }
+
+    if(col_offset!=0){std::cout << 2<< std::endl;}
 
     // initialize top-left corner
     int abs_type = std::abs(start_type);
@@ -70,6 +72,7 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
         }
         // else T3[0][i] stays -1
     }
+    if(col_offset!=0){std::cout << 3 << std::endl;}
 
     // initialize first column 
     for (int i = 1; i <= n; ++i) {
@@ -82,6 +85,7 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
         }
         // else T2[j][0] stays -1
     }
+    if(col_offset!=0){std::cout << 4 << std::endl;}
 
     //recurrence relation
     for(int i = 1; i < n+1; i++){
@@ -97,6 +101,7 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
             BT3[i][j] = from(T3_best, (T1[i-1][j] -(g+h)), (T2[i-1][j] -(g+h)), (T3[i-1][j] - g));
         }   
     }
+    if(col_offset!=0){std::cout << 5 << std::endl;}
 
     if (end_type > 0) {
         if (end_type == 1){ res.score = T1[n][m];}
@@ -104,13 +109,17 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
         else {res.score = T3[n][m];}
     } else {
         res.score = std::max({ T1[n][m], T2[n][m], T3[n][m] });
-    }
+    } 
+    if(col_offset!=0){std::cout << 6 << std::endl;}
+
 
     /* doing the traceback */
     int state = from(res.score, T1[n][m], T2[n][m], T3[n][m]);
     int i(n), j(m);
+    if(col_offset!=0){std::cout << 7 << std::endl;}
 
-    while (i > 0 || j > 0) {
+    while (i > 0 && j > 0) {
+        if (i==0 || j == 0){std::cout << "HELP" << std::endl;}
         if (state == 1) { // T1
             res.al.data.push_back({i-1 + row_offset, j-1+ col_offset});
             int bt = BT1[i][j];
@@ -128,8 +137,12 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
             state = bt;
         }
     }
+        if(col_offset!=0){std::cout << 8 << std::endl;}
+
 
     std::reverse(res.al.data.begin(), res.al.data.end());
+    if(col_offset!=0){std::cout << 9 << std::endl;}
+
     return res;
 }
 
@@ -746,6 +759,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 << std::endl;
             }
     result = solve_subproblem(sub_problem, start_idx, row_k1);
+    std::cout << "DONE: " << id << std::endl;
+
 }
 
 void output_alignement(alignment alignment, str A, str B){
