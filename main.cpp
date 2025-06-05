@@ -137,6 +137,16 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
             state = bt;
         }
     }
+
+    while(i>0){
+        res.al.data.push_back({i-1 + row_offset, -1});
+        i--;
+    }
+    while(j>0){
+        res.al.data.push_back({-1, j-1 + col_offset});
+        j--;
+    }
+
         if(col_offset!=0){std::cout << 8 << std::endl;}
 
 
@@ -821,9 +831,12 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     for (int i = 0; i < p; i++){
         workers[i].join();
     }
-    for (int i = 0; i < p/2; i+=2){
+    for (int i = 0; i < p/2; i++){
         TotalScore += results[i].score;
         FinalAlignment += results[i].al;
+        std::cout << "Result of thread " << 2*i << std::endl;
+        output_alignement(results[i].al, A, B);
+
     }
     std::cout << "Score: " << TotalScore << std::endl;
     output_alignement(FinalAlignment, A, B);

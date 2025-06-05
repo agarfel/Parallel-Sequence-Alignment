@@ -63,7 +63,10 @@ public:
     int score;
     alignment al;
 
-    result(){}
+    result(){
+        score = 0;
+        al = {};
+    }
 };
 
 
@@ -96,13 +99,17 @@ public:
 
         data = new int*[n];
         for(int i = 0; i<n; i++){
-            data[i] = new int[m];
+            data[i] = new int[m]();
         }
     }
 
-    ~Matrix(){
-        delete[] data;
+~Matrix(){
+    for (int i = 0; i < n; i++) {
+        delete[] data[i];  // Delete each row
     }
+    delete[] data;         // Delete the array of pointers
+}
+
 
     int* operator[](int i){
         return data[i];
