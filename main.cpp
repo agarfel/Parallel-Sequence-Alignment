@@ -851,14 +851,6 @@ void output_alignement(alignment alignment, str A, str B){
 }
 
 int run(std::vector<char> A, std::vector<char> B, int p){
-    /*
-    We want p even
-    */
-    if (p % 2 == 1){
-        std::cout << "ERROR: Only accept even number of processors." << std::endl;
-        return 1;
-    }
-    // std::cout<<"Initialising Function Arguments" << std::endl;
     std::vector<std::thread> workers(p);
     std::vector<result> results(p);
     std::condition_variable update; // notifies if there's a change to Working
@@ -882,9 +874,6 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     for (int i = 0; i < p; i++){
         TotalScore += results[i].score;
         FinalAlignment += results[i].al;
-        // std::cout << "Result of thread " << i << std::endl;
-        // output_alignement(results[i].al, A, B);
-
     }
     std::cout << "Score: " << TotalScore << std::endl;
     output_alignement(FinalAlignment, A, B);
@@ -895,31 +884,26 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     return 0;
 }
 
-int main(){
-    std::vector<char> A = readFastaSequence("sequences/insulin_bovin.fasta");
-    std::vector<char> B = readFastaSequence("sequences/insulin_homo.fasta");
+
+int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <sequence1.fasta> <sequence2.fasta> <p>\n";
+        return 1;
+    }
+    std::string folder = "sequences/";
+
+    std::string sequence1_filename = argv[1];
+    std::string sequence2_filename = argv[2];
+    int p = std::stoi(argv[3]);  // Convert string to int
+    std::cout<<p<<std::endl;
+    if (p%2 != 0){p = std::max({1, p-1});}
+    std::cout<<p<<std::endl;
+
+    std::vector<char> A = readFastaSequence(folder + sequence1_filename);
+    std::vector<char> B = readFastaSequence(folder+sequence2_filename);
+    std::cout<< "INPUT SEQUENCES:"<<std::endl;
     std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
               << "B: " << std::string(B.begin(), B.end()) << std::endl;
-
-    // std::cout << "B[col1] = B[0]: " << B[0] << std::endl;
-    // std::cout << "B[col2] = B[36]: " << A[36] << std::endl;
-    // std::cout << "B[col3] = B[72]: " << A[72] << std::endl;
-
-    // std::cout << "2 Threads" << std::endl;
-    // run(A, B, 2);
-    // std::cout << "4 Threads" << std::endl;
-    // run(A, B, 4);
-    // std::cout << "2 Threads" << std::endl;
-    run(A, B, 6);
+    run(A, B, 1);
     return 0;
 }
-// 0                                   1                                 2
-// MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYTPKARREVEGPQVGALELAG GPGAG-----GLEGPPQKRGIVEQCCASVCSLYQLENYCN
-// MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGG GPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN
-// MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVE-ALYLVCGERGFFYTPKARREVEGPQVGALELA G--G----PGAGGLEGPPQKRGIVEQCCASVCSLYQLENYCN
-// MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEEALYLVCGERGFFYTPKTRREAEDLQVGQVELG GGPGGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENY--
-
-// A: MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYTPKARREVEGPQVGALELAGGPGAGGLEGPPQKRGIVEQCCASVCSLYQLENYCN
-// B: MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN
-// A: MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLV-ALYLVCGERGFFYTPKARREVEGPQVGALEL-AGG-----GAGGLEGPPQKRGIVEQCCASVCSLYQLENYCN
-// B: MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENY--
