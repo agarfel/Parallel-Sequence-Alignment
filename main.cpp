@@ -177,6 +177,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     result& result){
 
     int num_blocks = p / 2;
+    if (p==1){num_blocks=1;}
+
     int B_len;
     if ((id == p-2) || (id == p-1)){
         B_len = (m / num_blocks) + (m % num_blocks);
@@ -198,10 +200,11 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
     // Decomposing
     while (((col_k2 - col_k1 > 1) && (row_k1 +1 != row_k2)) && p > 2){
-        // {
-        // std::lock_guard<std::mutex> lock(working_mutexes[0]);
-        // std::cout << "THREAD: " <<id<< " DECOMPOSING" << std::endl;
-        // }
+        {
+        std::lock_guard<std::mutex> lock(working_mutexes[0]);
+        std::cout << "THREAD: " <<id<< " DECOMPOSING" << std::endl;
+        std::cout << col_k2 - col_k1 << std::endl;
+        }
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
 
@@ -751,31 +754,31 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         row_k2 = info[id].bottom_row; // index of last special row (in group)
         s = info[id].s;
         e = info[id].e;
-            // {
-            //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
-            //     std::cout<< "UPDATED INFO - THREAD: " << id << "\n"
-            //     << "col_k1: " << col_k1 <<"\n"
-            //     << "col_k2: " << col_k2 <<"\n"
-            //     << "row_k1: " << row_k1 <<"\n"
-            //     << "row_k2: " << row_k2 <<"\n"
-            //     << "s: " << s <<"\n"
-            //     << "3: " << e <<"\n"
-            //     << std::endl;
-            // }
+            {
+                std::lock_guard<std::mutex> lk(working_mutexes[0]);
+                std::cout<< "UPDATED INFO - THREAD: " << id << "\n"
+                << "col_k1: " << col_k1 <<"\n"
+                << "col_k2: " << col_k2 <<"\n"
+                << "row_k1: " << row_k1 <<"\n"
+                << "row_k2: " << row_k2 <<"\n"
+                << "s: " << s <<"\n"
+                << "3: " << e <<"\n"
+                << std::endl;
+            }
     }
 
 
     if ((id%2 == 1)||((!(2*col_k1 == id)) || (row_k2-row_k1 < 0))){
-        // {
-        //     std::lock_guard<std::mutex> lock(working_mutexes[0]);
-        //     std::cout << "KILLING THREAD: " <<id<< std::endl;
-        // }
+        {
+            std::lock_guard<std::mutex> lock(working_mutexes[0]);
+            std::cout << "KILLING THREAD: " <<id<< std::endl;
+        }
         return;
     }
-// {
-//     std::lock_guard<std::mutex> lock(working_mutexes[0]);
-//     std::cout << "THREAD: " <<id<< " SOLVING" << std::endl;
-// }
+{
+    std::lock_guard<std::mutex> lock(working_mutexes[0]);
+    std::cout << "THREAD: " <<id<< " SOLVING" << std::endl;
+}
             // {
             //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
             //     std::cout<< "UPDATED INFO - THREAD: " << id << "\n"
@@ -876,7 +879,7 @@ int run(std::vector<char> A, std::vector<char> B, int p){
         FinalAlignment += results[i].al;
     }
     std::cout << "Score: " << TotalScore << std::endl;
-    output_alignement(FinalAlignment, A, B);
+    // output_alignement(FinalAlignment, A, B);
     delete sharingT;
     delete sharingOpt;
     delete info;
@@ -895,15 +898,17 @@ int main(int argc, char* argv[]) {
     std::string sequence1_filename = argv[1];
     std::string sequence2_filename = argv[2];
     int p = std::stoi(argv[3]);  // Convert string to int
-    std::cout<<p<<std::endl;
     if (p%2 != 0){p = std::max({1, p-1});}
-    std::cout<<p<<std::endl;
 
     std::vector<char> A = readFastaSequence(folder + sequence1_filename);
     std::vector<char> B = readFastaSequence(folder+sequence2_filename);
-    std::cout<< "INPUT SEQUENCES:"<<std::endl;
-    std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
-              << "B: " << std::string(B.begin(), B.end()) << std::endl;
-    run(A, B, 1);
+    // std::cout<< "INPUT SEQUENCES:"<<std::endl;
+    // std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
+    //           << "B: " << std::string(B.begin(), B.end()) << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
+    run(A, B, p);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    std::cout << "Execution time: " << duration.count() << " nanoseconds\n";
     return 0;
 }
