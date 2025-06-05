@@ -150,7 +150,7 @@ Function called by each thread.
 */
 void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m, std::vector<int>& working,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<cell>>* sharingT,
-    std::vector<std::vector<cell>>* sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
+    std::vector<std::vector<cell>> sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
 
     int num_blocks = p / 2;
@@ -166,8 +166,6 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     std::cout << "Thread " << id << " has B_len: " << B_len << std::endl;
     }
     std::vector<char> B(B_ptr + (m/num_blocks)*(id/2), B_ptr + (m/num_blocks)*(id/2) + B_len); // Copy B part
-
-    int num_cols = B.size();
     int col_k1 = info[id].first; // index of first special column (in group)
     int col_k2 = info[id].last; // index of last special column (in group)
     int row_k1 = info[id].top_row; // index of first row (in group)
@@ -181,25 +179,25 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         bool ishead = (2*col_k1 == id);
 
         // Initialize curr and prev
-        std::vector<cell> T1_curr(num_cols + 1);
-        std::vector<cell> T2_curr(num_cols + 1);
-        std::vector<cell> T3_curr(num_cols + 1);
+        std::vector<cell> T1_curr(B_len + 1);
+        std::vector<cell> T2_curr(B_len + 1);
+        std::vector<cell> T3_curr(B_len + 1);
 
-        std::vector<cell> T1_prev(num_cols + 1, INF);
-        std::vector<cell> T2_prev(num_cols + 1, INF);
-        std::vector<cell> T3_prev(num_cols + 1, INF);
+        std::vector<cell> T1_prev(B_len + 1, INF);
+        std::vector<cell> T2_prev(B_len + 1, INF);
+        std::vector<cell> T3_prev(B_len + 1, INF);
 
         if(id % 2 == 0){
 
             // Copy Section of A we want
             int num_rows = (row_midk - row_k1);
             std::vector<char> A(A_ptr + row_k1, A_ptr + row_k1 + num_rows); // Copy A part
-            int m = num_cols; // amount of columns per thread
-            if (id == 2*col_k2){
-                m += info[id].plus;
-            }
+            // int m = B_len; // amount of columns per thread
+            // if (id == 2*col_k2){
+            //     B_len += info[id].plus;
+            // }
             // INITIALIZE T_prev for all threads:
-            for (int j = 0; j < num_cols; j++){          
+            for (int j = 0; j < B_len; j++){          
                     if (!((s == 1) || (s == 3))){ T2_prev[j].value = -h-g*(j + 1);}
                     if (s == -2){ T2_prev[j].value += h;}
             }
@@ -235,7 +233,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     update.notify_all();
                 }
                 // Compute T_curr:
-                for(int j = 1; j<m; j++){
+                for(int j = 1; j<B_len; j++){
                     // T1
                     if ((T1_prev[j-1].value >= T2_prev[j-1].value) && (T1_prev[j-1].value >= T3_prev[j-1].value)){
                         T1_curr[j].value = f(A[i], B[j]) + T1_prev[j-1].value;
@@ -320,9 +318,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                             update.wait(lock);
                         }
 
-                        (*sharingT)[0][id+2] = T1_curr[m-1];
-                        (*sharingT)[1][id+2] = T2_curr[m-1];
-                        (*sharingT)[2][id+2] = T3_curr[m-1];
+                        (*sharingT)[0][id+2] = T1_curr[B_len-1];
+                        (*sharingT)[1][id+2] = T2_curr[B_len-1];
+                        (*sharingT)[2][id+2] = T3_curr[B_len-1];
                         working[id+2] = 2;
                     }
                     update.notify_all();
@@ -343,28 +341,42 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             }
             // Copmute opt
             cell max_opt(INF);
-            int start = p * id * 2;
-            int end = start + num_cols;
-
 
             // Safer and clearer: use iterator arithmetic
-            auto& row0 = sharingTRev->at(0);
-            auto& row1 = sharingTRev->at(1);
-            auto& row2 = sharingTRev->at(2);
+            std::unique_lock<std::mutex> lock(working_mutexes[0]);
 
-            int start_idx = (m / num_blocks) * (id / 2);
+                auto& row0 = sharingTRev[0];
+                auto& row1 = sharingTRev[1];
+                auto& row2 = sharingTRev[2];
 
-            // Ensure bounds are valid
-            if (start_idx + B_len > row0.size()) {
-                throw std::out_of_range("Subvector range is out of bounds.");
+                int start_idx = (m / num_blocks) * (id / 2);
+                std::cout << "\n start_idx " << start_idx << " Last: " << start_idx + B_len << " Row0.size() = " << row0.size() << std::endl;
+                std::cout << "Copying thread " << id << ", start_idx = " << start_idx << ", B_len = " << B_len << "\n";
+                std::cout << "T1_curr.size() = " << T1_curr.size() << ", sharingTRev[0].size() = " << sharingTRev[0].size() << std::endl;
+
+                std::vector<cell> T1_Rev(row0.begin() + start_idx, row0.begin() + start_idx + B_len);
+                std::vector<cell> T2_Rev(row1.begin() + start_idx, row1.begin() + start_idx + B_len);
+                std::vector<cell> T3_Rev(row2.begin() + start_idx, row2.begin() + start_idx + B_len);
+
+            {
+                std::cout << "\n Thread " << id << std::endl;
+                for(int j = 0; j<B_len; j++){
+                    std::cout << T1_Rev[j].value << " ";
+                }
+                std::cout << "\n B_len = " << B_len << std::endl;
+                for(int j = 0; j<B_len; j++){
+                    std::cout <<  T2_Rev[j].value << " ";
+                }
+                std::cout << "\n start_idx = " << start_idx << std::endl;
+                for(int j = 0; j<B_len; j++){
+                    std::cout <<  T3_Rev[j].value << " ";
+                }
+                std::cout << "\n Size = " << T3_Rev.size() << std::endl;
             }
+            lock.unlock();
 
-            std::vector<cell> T1_Rev(row0.begin() + start_idx, row0.begin() + start_idx + B_len);
-            std::vector<cell> T2_Rev(row1.begin() + start_idx, row1.begin() + start_idx + B_len);
-            std::vector<cell> T3_Rev(row2.begin() + start_idx, row2.begin() + start_idx + B_len);
-
-            std::vector<int> tmps(num_cols-1);
-            for (int j = 0; j < num_cols; j++){
+            std::vector<int> tmps(B_len);
+            for (int j = 0; j < B_len; j++){
                 int tmp;
                 int o_row, r_row, o_type, r_type, TRevmax, Tmax;
                 if ((T1_Rev[j].value >= T2_Rev[j].value) && (T1_Rev[j].value >= T3_Rev[j].value)){
@@ -403,31 +415,21 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                     max_opt.r_row = r_row;
                 }
             }
-            {
 
-                        std::lock_guard<std::mutex> lock(working_mutexes[0]);
-                        std::cout << "Thread " << id << "\n" << std::endl;
-
-                        std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
-                        << "B: " << std::string(B.begin(), B.end()) << std::endl;
-                        for(int j = 1; j<m; j++){
-                            std::cout << T1_Rev[j].value << " ";
-                        }
-                }
-            {
-                std::lock_guard<std::mutex> lock(working_mutexes[0]);
+            // {
+            //     std::lock_guard<std::mutex> lock(working_mutexes[0]);
 
                 
-                std::vector<char> print_A(A_ptr + row_k1 +  max_opt.origin_row, A_ptr + row_midk + max_opt.r_row);
-                std::cout << "THREAD cut: " << id << "\n"
-                    << "row_k1: " << row_k1 << "\n"
-                    << "row_midk: " << row_midk << "\n"
-                    << "row_k2: " << row_k2 << "\n"
-                    << "origin_row: " << max_opt.origin_row << "\n"
-                    << "r_row: " << max_opt.r_row << "\n"
-                    << "A: " << std::string(print_A.begin(), print_A.end()) << "\n"
-                    << "B: " << std::string(B.begin(), B.end()) << std::endl;
-            }
+            //     std::vector<char> print_A(A_ptr + row_k1 +  max_opt.origin_row, A_ptr + row_midk + max_opt.r_row);
+            //     std::cout << "THREAD cut: " << id << "\n"
+            //         << "row_k1: " << row_k1 << "\n"
+            //         << "row_midk: " << row_midk << "\n"
+            //         << "row_k2: " << row_k2 << "\n"
+            //         << "origin_row: " << max_opt.origin_row << "\n"
+            //         << "r_row: " << max_opt.r_row << "\n"
+            //         << "A: " << std::string(print_A.begin(), print_A.end()) << "\n"
+            //         << "B: " << std::string(B.begin(), B.end()) << std::endl;
+            // }
 
             // Share opt
             (*sharingOpt)[id/2] = max_opt;
@@ -444,13 +446,12 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             std::vector<char> A(A_ptr + row_midk, A_ptr + row_midk + num_rows); // Copy A part
 
             // Compute TRev
-            int m = num_cols; // amount of columns per thread
-            if (id == 2*col_k2 +1){
-                m += info[id].plus;
-            }
+            // if (id == 2*col_k2 +1){
+            //     B_len += info[id].plus;
+            // }
 
             // INITIALIZE T_prev for all threads:
-            for (int j = num_cols -1; j >= 0; j--){          
+            for (int j = B_len -1; j >= 0; j--){          
                     if (!((e == 1) || (e == 3))){ T2_prev[j].value = -h-g*(j + 1);}
                     if (e == -2){T2_prev[j].value += h;}
             }
@@ -467,26 +468,26 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
                 if (id == (col_k2*2)+1){ // Rev Head
 
-                    T1_curr[num_cols -1].value = INF; // NEEDED?
-                    T2_curr[num_cols -1].value = INF; // NEEDED?
-                    T3_curr[num_cols -1].value = INF;
-                    if (!((s == 1) || (s == 2))){ T3_curr[num_cols -1].value = -h-g*(i + 1);}
-                    if (s == -3){ T3_curr[num_cols -1].value += h;}
-                    T1_curr[num_cols -1].r_row = i;
-                    T1_curr[num_cols -1].r_type = 1;
-                    T2_curr[num_cols -1].r_row = i;
-                    T2_curr[num_cols -1].r_type = 2;
-                    T3_curr[num_cols -1].r_row = i;
-                    T3_curr[num_cols -1].r_type = 3;
+                    T1_curr[B_len -1].value = INF; // NEEDED?
+                    T2_curr[B_len -1].value = INF; // NEEDED?
+                    T3_curr[B_len -1].value = INF;
+                    if (!((s == 1) || (s == 2))){ T3_curr[B_len -1].value = -h-g*(i + 1);}
+                    if (s == -3){ T3_curr[B_len -1].value += h;}
+                    T1_curr[B_len -1].r_row = i;
+                    T1_curr[B_len -1].r_type = 1;
+                    T2_curr[B_len -1].r_row = i;
+                    T2_curr[B_len -1].r_type = 2;
+                    T3_curr[B_len -1].r_row = i;
+                    T3_curr[B_len -1].r_type = 3;
                 } else {
                     {
                         std::unique_lock<std::mutex> lock(working_mutexes[id]);
                         while (working[id] != 2){
                             update.wait(lock);
                         }
-                        T1_curr[num_cols-1] = (*sharingT)[0][id];
-                        T2_curr[num_cols-1] = (*sharingT)[1][id];
-                        T3_curr[num_cols-1] = (*sharingT)[2][id];
+                        T1_curr[B_len-1] = (*sharingT)[0][id];
+                        T2_curr[B_len-1] = (*sharingT)[1][id];
+                        T3_curr[B_len-1] = (*sharingT)[2][id];
 
                         working[id] = 1;
                     }
@@ -494,7 +495,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 }
 
                 // Compute T_curr:
-                for (int j = num_cols -1; j >= 0; j--){
+                for (int j = B_len -1; j >= 0; j--){
                     // T1
                     if ((T1_prev[j+1].value >= T2_prev[j+1].value) && (T1_prev[j+1].value >= T3_prev[j+1].value)){
                         T1_curr[j].value = f(A[i], B[j]) + T1_prev[j+1].value;
@@ -573,20 +574,38 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
                 std::swap(T3_prev, T3_curr);
 
             }
-
-        }
         {
+            std::unique_lock<std::mutex> lk(working_mutexes[0]);
             std::lock_guard<std::mutex> lock(working_mutexes[id]);
 
-            // Safer and clearer: use iterator arithmetic
             int start_idx = (m / num_blocks) * (id / 2);
-            std::copy(T1_curr.begin(), T1_curr.begin() + (T1_curr.size()-1), (*sharingTRev)[0].begin() + start_idx);
-            std::copy(T2_curr.begin(), T2_curr.begin() + (T2_curr.size()-1), (*sharingTRev)[1].begin() + start_idx);
-            std::copy(T3_curr.begin(), T3_curr.begin() + (T3_curr.size()-1), (*sharingTRev)[2].begin() + start_idx);
+            std::copy(T1_curr.begin(), T1_curr.begin() + B_len, sharingTRev[0].begin() + start_idx);
+            std::copy(T2_curr.begin(), T2_curr.begin() + B_len, sharingTRev[1].begin() + start_idx);
+            std::copy(T3_curr.begin(), T3_curr.begin() + B_len, sharingTRev[2].begin() + start_idx);
+            // std::cout<< "Size of T_Rev = "<< (*sharingTRev)[2].size()<< std::endl;
+            // std::cout<< "start_idx = "<< start_idx << std::endl;
+            // std::cout<< "B_len + start_idx = "<< B_len + start_idx << std::endl;
 
+                {
+                std::cout << "\n T_curr: Thread " << id << std::endl;
+                for(int j = 0; j<B_len; j++){
+                    std::cout << T1_curr[j].value << " ";
+                }
+                std::cout << "\n B_len = " << B_len << std::endl;
+                for(int j = 0; j<B_len; j++){
+                    std::cout <<  T2_curr[j].value << " ";
+                }
+                std::cout << "\n start_idx = " << start_idx << std::endl;
+                for(int j = 0; j<B_len; j++){
+                    std::cout <<  T3_curr[j].value << " ";
+                }
+                std::cout << "\n Size = " << T3_curr.size() << std::endl;
+            }
             working[id] = 4;
         }
         update.notify_all();
+        }
+
 
         // SYNCHRONISATION POINT: all partial opt's are computed
         if (ishead){    // Current thread is Head
@@ -719,13 +738,14 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     std::vector<int> Working(p, 1); // vector of size p, Working[i] = 1 if thread i is working, 0 otherwise
     std::vector<std::mutex> working_mutexes(p);
     std::vector<std::vector<cell>>* sharingT = new std::vector<std::vector<cell>>(3, std::vector<cell>(p));
-    std::vector<std::vector<cell>>* sharingTRev = new std::vector<std::vector<cell>>(3, std::vector<cell>(B.size()));
+    std::vector<std::vector<cell>> sharingTRev(3, std::vector<cell>(B.size()));
+
     std::vector<cell>* sharingOpt = new std::vector<cell>(p/2, cell(INF));
     std::vector<Info>* info = new std::vector<Info>(p, Info(0,p/2 -1, 0, A.size(), -1, -1,0));
 
     for (int i = 0; i<p; i++){
         workers[i] = std::thread(thread_f, A.data(), B.data(), p,i, A.size(), B.size(), std::ref(Working),
-        std::ref(working_mutexes), std::ref(update), sharingT, sharingTRev, sharingOpt, std::ref(*info), std::ref(results[i]));
+        std::ref(working_mutexes), std::ref(update), sharingT, std::ref(sharingTRev), sharingOpt, std::ref(*info), std::ref(results[i]));
     }
     int TotalScore = 0;
     alignment FinalAlignment;
@@ -739,7 +759,6 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     std::cout << "Score: " << TotalScore << std::endl;
     output_alignement(FinalAlignment, A, B);
     delete sharingT;
-    delete sharingTRev;
     delete sharingOpt;
     delete info;
 
