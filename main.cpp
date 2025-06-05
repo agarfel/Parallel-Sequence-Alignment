@@ -21,6 +21,35 @@ int from(int best, int t1, int t2, int t3){
     return 3;
 }
 
+void output_alignement(alignment alignment, str A, str B){
+    std::string al_A = "";
+    std::string al_B = "";
+    int len = alignment.data.size();
+
+    for(int k = 0; k < len; k++){
+        int i = alignment.data[k].first;
+        if(i == -1){
+            al_A += "-";
+        }
+        else{
+            al_A += A[i];
+        }
+        int j = alignment.data[k].second;
+        if(j == -1){
+            al_B += "-";
+        }
+        else{
+            al_B += B[j];
+        }
+    }
+    std::cout << "Length Sequence A : " << al_A.size() << std::endl;
+    std::cout << "Length Sequence B : " << al_A.size() << std::endl;
+
+    std::cout << "Sequence A : " << al_A << std::endl;
+    std::cout << "Sequence B : " << al_B << std::endl;
+
+}
+
 /* function should be correct, watch out for out of bound indices in the trace back maybe but otherwise it works */
 result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){ // one or two sub_problems
 
@@ -175,7 +204,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<cell>>* sharingT,
     std::vector<std::vector<cell>> &sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
+    int leftmost_col;
 
+        int iter = 0;
     int num_blocks = p / 2;
     if (p==1){num_blocks=1;}
 
@@ -200,11 +231,11 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
     // Decomposing
     while (((col_k2 - col_k1 > 1) && (row_k1 +1 != row_k2)) && p > 2){
-        {
-        std::lock_guard<std::mutex> lock(working_mutexes[0]);
-        std::cout << "THREAD: " <<id<< " DECOMPOSING" << std::endl;
-        std::cout << col_k2 - col_k1 << std::endl;
-        }
+        // {
+        // std::lock_guard<std::mutex> lock(working_mutexes[0]);
+        // std::cout << "THREAD: " <<id<< " DECOMPOSING" << std::endl;
+        // std::cout << col_k2 - col_k1 << std::endl;
+        // }
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
 
@@ -655,13 +686,17 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             }
             // Get Max OPT
             cell max_opt(INF);
-            int leftmost_col;
 
-            for (int j = 0; j < num_blocks; j++){
+            for (int j = col_k1; j < col_k2+1; j++){
+
+                std::lock_guard<std::mutex> lock(working_mutexes[0]);
                 if ((*sharingOpt)[j].value > max_opt.value){
                     max_opt = (*sharingOpt)[j];
                     leftmost_col = j;   
                 }
+            }
+ 
+                         
             //     {
             //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
             //     std::cout<< "OPT For Columns: " << j << "\n"
@@ -672,7 +707,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             //     << "value: " << (*sharingOpt)[j].value <<"\n"
             //     << std::endl;
             // }
-            }
+            
             // {
             //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
             //     std::cout<< "OPT VALUES: " << std::endl;
@@ -683,10 +718,10 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             // SPLIT PROBLEM
 
             int r1 = max_opt.origin_row  + row_k1-1;
-            int r2 = max_opt.r_row + row_midk +1; // rows where we split the problem [get using next and prev]
+            int r2 = max_opt.r_row + row_midk+1; // rows where we split the problem [get using next and prev]
             int t1 = max_opt.origin_type;
             int t2 = max_opt.r_type; // types where we split the problem
-            // {
+            // if(iter==1){
             //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
             //     std::cout<< "Splitting Problem: " << "\n"
             //     << "r1: " << r1 <<"\n"
@@ -704,29 +739,18 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             // }
             for (int thread_id = 2*col_k1; thread_id < 2*leftmost_col; thread_id++){
                 info[thread_id] = Info(col_k1, leftmost_col-1, row_k1, r1, s, t1,1);
-                // std::cout << "1 - THREAD: " << thread_id << std::endl;
             }
             for (int thread_id = 2*leftmost_col +2 ; thread_id < 2*col_k2 + 2; thread_id++){
                 info[thread_id] = Info(leftmost_col +1,col_k2, r2, row_k2, t2, e,0);
-                // std::cout << "2 - THREAD: " << thread_id << std::endl;
 
             }
-            info[2*leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
-            info[2*leftmost_col+1] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
-            // std::cout << "3 - Thread: " << 2*leftmost_col << std::endl;
-            // std::cout << "3 - Thread: " << 2*leftmost_col +1 << std::endl;
+                info[2*leftmost_col] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
+                info[2*leftmost_col+1] = Info(leftmost_col, leftmost_col, r1, r2, t1, t2, 1);
 
             if(leftmost_col == col_k1){
-            // std::cout << "4 - Thread: " << 2*leftmost_col << std::endl;
-            // std::cout << "4 - Thread: " << 2*leftmost_col +1 << std::endl;
-
-            info[leftmost_col*2] = Info(leftmost_col, leftmost_col, row_k1, r2, t1, t2, 1);
-            info[leftmost_col*2+1] = Info(leftmost_col, leftmost_col, row_k1, r2, t1, t2, 1);
-            }
-
-            if(leftmost_col == col_k2){
-            // std::cout << "5 - Thread: " << 2*leftmost_col << std::endl;
-            // std::cout << "5 - Thread: " << 2*leftmost_col +1 << std::endl;
+                info[leftmost_col*2] = Info(leftmost_col, leftmost_col, row_k1, r2, t1, t2, 1);
+                info[leftmost_col*2+1] = Info(leftmost_col, leftmost_col, row_k1, r2, t1, t2, 1);
+            } else if(leftmost_col == col_k2){
                 info[leftmost_col*2] = Info(leftmost_col, leftmost_col, r1, row_k2, t1, t2, 1);
                 info[leftmost_col*2+1] = Info(leftmost_col, leftmost_col, r1, row_k2, t1, t2, 1);
             }
@@ -754,31 +778,33 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         row_k2 = info[id].bottom_row; // index of last special row (in group)
         s = info[id].s;
         e = info[id].e;
-            {
-                std::lock_guard<std::mutex> lk(working_mutexes[0]);
-                std::cout<< "UPDATED INFO - THREAD: " << id << "\n"
-                << "col_k1: " << col_k1 <<"\n"
-                << "col_k2: " << col_k2 <<"\n"
-                << "row_k1: " << row_k1 <<"\n"
-                << "row_k2: " << row_k2 <<"\n"
-                << "s: " << s <<"\n"
-                << "3: " << e <<"\n"
-                << std::endl;
-            }
+            // if(id<6){
+            //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
+            //     std::cout<< "UPDATED INFO - THREAD: " << id << "\n"
+            //     << "col_k1: " << col_k1 <<"\n"
+            //     << "col_k2: " << col_k2 <<"\n"
+            //     << "row_k1: " << row_k1 <<"\n"
+            //     << "row_k2: " << row_k2 <<"\n"
+            //     << "s: " << s <<"\n"
+            //     << "e: " << e <<"\n"
+            //     << std::endl;
+            // }
+            // if(iter == 2){return;}
+            // iter++;
     }
 
 
     if ((id%2 == 1)||((!(2*col_k1 == id)) || (row_k2-row_k1 < 0))){
-        {
-            std::lock_guard<std::mutex> lock(working_mutexes[0]);
-            std::cout << "KILLING THREAD: " <<id<< std::endl;
-        }
+        // {
+        //     std::lock_guard<std::mutex> lock(working_mutexes[0]);
+        //     std::cout << "KILLING THREAD: " <<id<< std::endl;
+        // }
         return;
     }
-{
-    std::lock_guard<std::mutex> lock(working_mutexes[0]);
-    std::cout << "THREAD: " <<id<< " SOLVING" << std::endl;
-}
+// {
+//     std::lock_guard<std::mutex> lock(working_mutexes[0]);
+//     std::cout << "THREAD: " <<id<< " SOLVING" << std::endl;
+// }
             // {
             //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
             //     std::cout<< "UPDATED INFO - THREAD: " << id << "\n"
@@ -797,7 +823,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     } else {
         B_len += m/num_blocks;
     }
-    int start_idx = (m / num_blocks) * (id / 2);
+    int start_idx = (m / num_blocks) * col_k1;
 
     std::vector<char> B2(B_ptr+start_idx, B_ptr +start_idx+ B_len); // Copy B part
 
@@ -817,43 +843,28 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             //     << "B: " << std::string(B2.begin(), B2.end()) <<"\n"
             //     << "s: " << s <<"\n"
             //     << "e: " << e <<"\n"
+            //     << "row_k1: " << row_k1 <<"\n"
+            //     << "row_k2: " << row_k2 <<"\n"
+            //     << "B_len: " << B_len <<"\n"
+            //     << "Start_idx: " << start_idx <<"\n"
             //     << std::endl;
             // }
     result = solve_subproblem(sub_problem, start_idx, row_k1);
     // std::cout << "DONE: " << id << std::endl;
+            // {
+            //  std::lock_guard<std::mutex> lk(working_mutexes[0]);
+            // std::vector<char> A_F(A_ptr, A_ptr + n); // Copy B part
+            // std::vector<char> B_F(B_ptr, B_ptr + m); // Copy B part
+            // output_alignement(result.al, A_F, B_F);
 
-}
-
-void output_alignement(alignment alignment, str A, str B){
-    std::string al_A = "";
-    std::string al_B = "";
-    int len = alignment.data.size();
-
-    for(int k = 0; k < len; k++){
-        int i = alignment.data[k].first;
-        if(i == -1){
-            al_A += "-";
-        }
-        else{
-            al_A += A[i];
-        }
-        int j = alignment.data[k].second;
-        if(j == -1){
-            al_B += "-";
-        }
-        else{
-            al_B += B[j];
-        }
-    }
-    std::cout << "Length Sequence A : " << al_A.size() << std::endl;
-    std::cout << "Length Sequence B : " << al_A.size() << std::endl;
-
-    std::cout << "Sequence A : " << al_A << std::endl;
-    std::cout << "Sequence B : " << al_B << std::endl;
+            // }
 
 }
 
 int run(std::vector<char> A, std::vector<char> B, int p){
+
+    if (p%2 != 0){p = std::max({1, p-1});}
+
     std::vector<std::thread> workers(p);
     std::vector<result> results(p);
     std::condition_variable update; // notifies if there's a change to Working
@@ -877,9 +888,11 @@ int run(std::vector<char> A, std::vector<char> B, int p){
     for (int i = 0; i < p; i++){
         TotalScore += results[i].score;
         FinalAlignment += results[i].al;
+        // output_alignement(results[i].al, A, B);
+
     }
     std::cout << "Score: " << TotalScore << std::endl;
-    // output_alignement(FinalAlignment, A, B);
+    output_alignement(FinalAlignment, A, B);
     delete sharingT;
     delete sharingOpt;
     delete info;
@@ -889,26 +902,38 @@ int run(std::vector<char> A, std::vector<char> B, int p){
 
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <sequence1.fasta> <sequence2.fasta> <p>\n";
-        return 1;
-    }
+    // if (argc != 4) {
+    //     std::cerr << "Usage: " << argv[0] << " <sequence1.fasta> <sequence2.fasta> <p>\n";
+    //     return 1;
+    // }
     std::string folder = "sequences/";
 
-    std::string sequence1_filename = argv[1];
-    std::string sequence2_filename = argv[2];
-    int p = std::stoi(argv[3]);  // Convert string to int
-    if (p%2 != 0){p = std::max({1, p-1});}
-
+    std::string sequence1_filename = "insulin_homo.fasta"; //argv[1];
+    std::string sequence2_filename = "insulin_bovin.fasta";//argv[2];
+    int p = 12;//std::stoi(argv[3]);  // Convert string to int
     std::vector<char> A = readFastaSequence(folder + sequence1_filename);
     std::vector<char> B = readFastaSequence(folder+sequence2_filename);
     // std::cout<< "INPUT SEQUENCES:"<<std::endl;
     // std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
     //           << "B: " << std::string(B.begin(), B.end()) << std::endl;
-    auto start = std::chrono::high_resolution_clock::now();
-    run(A, B, p);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-    std::cout << "Execution time: " << duration.count() << " nanoseconds\n";
+    // for(p = 1; p < 24; p++){
+    // auto start = std::chrono::high_resolution_clock::now();
+    // run(A, B, p);
+    // auto end = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    // std::cout << "Execution time for " << p << " processors: " << duration.count() << " nanoseconds\n";
+    // }
+
+    // auto start = std::chrono::high_resolution_clock::now();
+    run(A, B, 10);
+    run(A, B, 12);
+
+    // auto end = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    // std::cout << "Execution time for " << p << " processors: " << duration.count() << " nanoseconds\n";
     return 0;
 }
+// MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFF-YTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN // Sequence A : 
+// MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYT-PKARREVEGPQVGALELAGGPGAG-----GLEGPPQKRGIVEQCCASVCSLYQLENYCN // Sequence B : 
+// MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN // Sequence A : 
+// MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYTPKARREVEGPQVGALELAGGPGAGGLEGPPQKRGIVEQCCASVCSLYQLENYCN // Sequence B : 
