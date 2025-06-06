@@ -31,6 +31,25 @@ int from(int best, int t1, int t2, int t3){
     return 3;
 }
 
+pair find_last(alignment al){
+    pair mypair;
+    for(int i = 0; i < al.data.size(); i++){
+        if(al.data[i].first != -1){
+            mypair.first = al.data[i].first;
+            break;
+        }
+
+    }
+    for(int j = 0; j < al.data.size(); j++){
+        if(al.data[j].second != -1){
+            mypair.second = al.data[j].second;
+            break;
+        }
+    }
+
+    return mypair;
+
+}
 void output_alignement(alignment alignment, str A, str B){
     std::string al_A = "";
     std::string al_B = "";
@@ -91,31 +110,38 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
 
     std::vector<char> B(B_full.begin()+start, B_full.begin() + B_len); // Copy B part
 
-    int num_cols = B.size();
-    int num_rows = A.size();
+    int m = B.size();
+    int n = A.size();
 
     bool ishead = (id == 0);
-    std::vector<Entry> row1_T1(num_cols + 1);
-    std::vector<Entry> row1_T2(num_cols + 1);
-    std::vector<Entry> row1_T3(num_cols + 1);
+    std::vector<Entry> row1_T1(m + 1);
+    std::vector<Entry> row1_T2(m + 1);
+    std::vector<Entry> row1_T3(m + 1);
 
-    std::vector<Entry> row2_T1(num_cols + 1);
-    std::vector<Entry> row2_T2(num_cols + 1);
-    std::vector<Entry> row2_T3(num_cols + 1);
+    std::vector<Entry> row2_T1(m + 1);
+    std::vector<Entry> row2_T2(m + 1);
+    std::vector<Entry> row2_T3(m + 1);
 
-    int m = num_cols;
-   
-    if(ishead){
-        row1_T1[0].value = 0;
+    // initialise 1st rows
+    for(int j = 0; j < m +1; j++){
+        row1_T1[j].value = -1;
+        row1_T3[j].value = -(h + g * j);
     }
 
-    for (int i = 1; i < num_rows; i++){ // COMPUTE ALL ROWS
+    // compute all rows 
+    for (int i = 1; i < n+1; i++){ 
         // Get T[i][0]:
         if (ishead){
-            row1_T1[0].value = INF; // NEEDED?
-            row1_T2[0].value = INF; // NEEDED?
-           row1_T3[0].value = -h-g*(i + 1);
-            row1_T3[0].value += h;
+            row1_T1[0].value = -1;
+            row2_T1[0].value = -1; 
+            if(i == 1){row1_T1[0].value = 0;}
+            
+            row1_T2[0].value = -(h + g * (i-1));
+            row2_T2[0].value = -(h + g * i);
+
+            row1_T3[0].value = -1;
+            row2_T3[0].value = -1;
+
         } else {
             {
                 std::unique_lock<std::mutex> lock(working_mutexes[id]);
@@ -132,30 +158,29 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
                 row2_T2[0] = (*sharingT)[4][id];
                 row2_T3[0] = (*sharingT)[5][id];
 
-
                 working[id] = 1;
             }
             update.notify_all();
         }
-        // Compute T[i]:
+        // Compute T_k[i]:
         int t1, t2, t3;
         for(int j = 1; j<m+1; j++){
             // T1
             t1 = row1_T1[j-1].value;
             t2 = row1_T2[j-1].value;
-            t2 = row1_T3[j-1].value;
+            t3 = row1_T3[j-1].value;
             if ((t1 >= t2) && (t1 >= t3)){ // from T1
                 row2_T1[j].value = f(A[i-1], B[j-1]) + t1;
                 row2_T1[j].al = row1_T1[j-1].al;
-                row2_T1[j].al.data.push_back({i, j + start});
+                row2_T1[j].al.data.push_back({i-1, j-1 + start});
             } else  if (t2 >= t3){ // from T2
                 row2_T1[j].value =  f(A[i-1], B[j-1]) + t2;
                 row2_T1[j].al = row1_T2[j-1].al;
-                row2_T1[j].al.data.push_back({-1, j + start});
+                row2_T1[j].al.data.push_back({-1, j-1 + start});
             } else { // from T3
                 row2_T1[j].value =  f(A[i-1], B[j-1]) + t3;
                 row2_T1[j].al = row1_T3[j-1].al;
-                row2_T1[j].al.data.push_back({i, -1});
+                row2_T1[j].al.data.push_back({i-1, -1});
             }
             // T3
             t1 = row1_T1[j].value - (g+h);
@@ -164,17 +189,17 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
             if ((t1 >= t2) && (t1 >= t3)){ // from T1
                 row2_T3[j].value = t1;
                 row2_T3[j].al = row1_T1[j].al;
-                row2_T3[j].al.data.push_back({i, j + start});
+                row2_T3[j].al.data.push_back({i-1, j-1 + start});
 
             } else  if (t2 >= t3){ // from T2
                 row2_T3[j].value = t2;
                 row2_T3[j].al = row1_T2[j].al;
-                row2_T3[j].al.data.push_back({-1, j + start});
+                row2_T3[j].al.data.push_back({-1, j-1 + start});
 
             } else { // from T3
                 row2_T3[j].value = t3;
                 row2_T3[j].al = row1_T3[j].al;
-                row2_T3[j].al.data.push_back({i, -1});
+                row2_T3[j].al.data.push_back({i-1, -1});
             }
             // T2
             t1 = row2_T1[j-1].value - (g+h);
@@ -183,17 +208,17 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
             if ((t1 >= t2) && (t1 >= t3)){ // from T1
                 row2_T2[j].value = t1;
                 row2_T2[j].al = row2_T1[j-1].al;
-                row2_T2[j].al.data.push_back({i, j + start});
+                row2_T2[j].al.data.push_back({i-1, j-1 + start});
 
             } else if (t2 >= t3){ // from T2
                 row2_T2[j].value = t2;
                 row2_T2[j].al = row2_T2[j-1].al;
-                row2_T2[j].al.data.push_back({-1, j + start});
+                row2_T2[j].al.data.push_back({-1, j-1 + start});
 
             } else { // from T3
                 row2_T2[j].value = t3;
                 row2_T2[j].al = row2_T3[j-1].al;
-                row2_T2[j].al.data.push_back({i, -1});
+                row2_T2[j].al.data.push_back({i-1, -1});
             }
         }
         // Share last value:
@@ -228,15 +253,16 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
 
     if(id == p-1){ // last processor
 
-        int t1(row1_T1[m-1].value), t2(row1_T2[m-1].value), t3(row1_T3[m-1].value);
+        int t1(row1_T1[m].value), t2(row1_T2[m].value), t3(row1_T3[m].value);
+
         if((t1 >= t2) && (t1 >= t3)){ // best in T1
-            FinalResult = result(t1, row1_T1[m-1].al);
+            FinalResult = result(t1, row1_T1[m].al);
         }
         else if(t2 >= t3){ // best in T2
-            FinalResult = result(t2, row1_T2[m-1].al);
+            FinalResult = result(t2, row1_T2[m].al);
         }
         else { // best in T3
-            FinalResult = result(t3, row1_T3[m-1].al);
+            FinalResult = result(t3, row1_T3[m].al);
         }
         
     }
@@ -259,13 +285,26 @@ result run(int p, str A, str B){
     for (int i = 0; i < p-1; i++){
         workers[i].join();
     }
-
+   
+    pair pair = find_last(FinalResult.al);
+    int i(pair.first), j(pair.second);
+    std::reverse(FinalResult.al.data.begin(), FinalResult.al.data.end());
+    while(i > 0){
+        FinalResult.al.data.push_back({i-1, -1});
+        i--;
+    }
+    while(j > 0){
+        FinalResult.al.data.push_back({-1, j-1});
+        j--;
+    }
+    std::reverse(FinalResult.al.data.begin(), FinalResult.al.data.end());
+    
     return FinalResult;
 
 }
 
 int main(){
-    int p = 12;
+    int p = 10;
     str A = readFastaSequence("sequences/insulin_homo.fasta");
     str B = readFastaSequence("sequences/insulin_bovin.fasta");
     result Result = run(p, A, B);
