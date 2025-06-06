@@ -205,8 +205,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     std::vector<std::vector<cell>> &sharingTRev, std::vector<cell>* sharingOpt, std::vector<Info>& info,
     result& result){
     int leftmost_col;
-
-        int iter = 0;
+    int iter = 0;
     int num_blocks = p / 2;
     if (p==1){num_blocks=1;}
 
@@ -226,7 +225,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     int e = info[id].e;
 
     // Decomposing
-    while (((col_k2 - col_k1 > 1) && (row_k1 +1 != row_k2)) && p > 2){
+    while (((col_k2 - col_k1 > 1) && (row_k1 +1 != row_k2)) && ((p > 2)&& (B_len >10))){
         // {
         // std::lock_guard<std::mutex> lock(working_mutexes[0]);
         // std::cout << "THREAD: " <<id<< " DECOMPOSING" << std::endl;
@@ -834,19 +833,19 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     sub_problem.s = s;
     sub_problem.e = e;
 
-                {
-                std::lock_guard<std::mutex> lk(working_mutexes[0]);
-                std::cout<< "SUBPROBLEM INFO - THREAD: " << id << "\n"
-                << "A: " << std::string(A.begin(), A.end()) <<"\n"
-                << "B: " << std::string(B2.begin(), B2.end()) <<"\n"
-                << "s: " << s <<"\n"
-                << "e: " << e <<"\n"
-                << "row_k1: " << row_k1 <<"\n"
-                << "row_k2: " << row_k2 <<"\n"
-                << "B_len: " << B_len <<"\n"
-                << "Start_idx: " << start_idx <<"\n"
-                << std::endl;
-            }
+            //     {
+            //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
+            //     std::cout<< "SUBPROBLEM INFO - THREAD: " << id << "\n"
+            //     << "A: " << std::string(A.begin(), A.end()) <<"\n"
+            //     << "B: " << std::string(B2.begin(), B2.end()) <<"\n"
+            //     << "s: " << s <<"\n"
+            //     << "e: " << e <<"\n"
+            //     << "row_k1: " << row_k1 <<"\n"
+            //     << "row_k2: " << row_k2 <<"\n"
+            //     << "B_len: " << B_len <<"\n"
+            //     << "Start_idx: " << start_idx <<"\n"
+            //     << std::endl;
+            // }
     result = solve_subproblem(sub_problem, start_idx, row_k1, info[id].plus);
     // std::cout << "DONE: " << id << std::endl;
             // {
@@ -862,7 +861,10 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 int run(std::vector<char> A, std::vector<char> B, int p){
 
     if (p%2 != 0){p = std::max({1, p-1});}
-
+    while(B.size()/p <= 10){
+        p -= 2;
+    }
+    std::cout << "Using only: " << p <<" processors"<<std::endl;
     std::vector<std::thread> workers(p);
     std::vector<result> results(p);
     std::condition_variable update; // notifies if there's a change to Working
@@ -911,19 +913,19 @@ int main(int argc, char* argv[]) {
     int p = 12;//std::stoi(argv[3]);  // Convert string to int
     std::vector<char> A = readFastaSequence(folder + sequence1_filename);
     std::vector<char> B = readFastaSequence(folder+sequence2_filename);
-    std::cout<< "INPUT SEQUENCES:"<<std::endl;
-    std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
-              << "B: " << std::string(B.begin(), B.end()) << std::endl;
-    // for(p = 1; p < 24; p++){
-    // auto start = std::chrono::high_resolution_clock::now();
-    // run(A, B, p);
-    // auto end = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-    // std::cout << "Execution time for " << p << " processors: " << duration.count() << " nanoseconds\n";
-    // }
+    // std::cout<< "INPUT SEQUENCES:"<<std::endl;
+    // std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
+    //           << "B: " << std::string(B.begin(), B.end()) << std::endl;
+    for(p = 1; p < 100; p++){
+    auto start = std::chrono::high_resolution_clock::now();
+    run(A, B, p);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    std::cout << "Execution time for " << p << " processors: " << duration.count() << " nanoseconds\n";
+    }
 
     // auto start = std::chrono::high_resolution_clock::now();
-    run(A, B, 10);
+    // run(A, B, 10);
     // run(A, B, 12);
 
     // auto end = std::chrono::high_resolution_clock::now();
