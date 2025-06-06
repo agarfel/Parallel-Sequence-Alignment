@@ -72,7 +72,7 @@ public:
 
 class Info{
 public:
-    Info(int f, int l, int t, int b, int st, int et, int p) {
+    Info(int f, int l, int t, int b, int st, int et, int p=0) {
         first = f;
         last = l;
         top_row = t;

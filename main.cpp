@@ -51,7 +51,7 @@ void output_alignement(alignment alignment, str A, str B){
 }
 
 /* function should be correct, watch out for out of bound indices in the trace back maybe but otherwise it works */
-result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){ // one or two sub_problems
+result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset, int overlap){ // one or two sub_problems
 
     str A = sub_problem.A;
     str B = sub_problem.B;
@@ -133,11 +133,11 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
     //if(col_offset!=0){std::cout << 5 << std::endl;}
 
     if (end_type > 0) {
-        if (end_type == 1){ res.score = T1[n][m];}
-        else if (end_type == 2) {res.score = T2[n][m];}
-        else {res.score = T3[n][m];}
+        if (end_type == 1){ res.score = T1[n-overlap][m];}
+        else if (end_type == 2) {res.score = T2[n-overlap][m];}
+        else {res.score = T3[n-overlap][m];}
     } else {
-        res.score = std::max({ T1[n][m], T2[n][m], T3[n][m] });
+        res.score = std::max({ T1[n-overlap][m], T2[n-overlap][m], T3[n-overlap][m] });
     } 
     //if(col_offset!=0){std::cout << 6 << std::endl;}
 
@@ -146,9 +146,9 @@ result solve_subproblem(extended_P sub_problem, int col_offset, int row_offset){
     int state = from(res.score, T1[n][m], T2[n][m], T3[n][m]);
     int i(n), j(m);
     //if(col_offset!=0){std::cout << 7 << std::endl;}
+    i-=overlap;
 
     while (i > 0 && j > 0) {
-        if (i==0 || j == 0){std::cout << "HELP" << std::endl;}
         if (state == 1) { // T1
             res.al.data.push_back({i-1 + row_offset, j-1+ col_offset});
             int bt = BT1[i][j];
@@ -217,11 +217,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     } else {
         B_len = m/num_blocks;
     }
-    // {
-    // std::lock_guard<std::mutex> lock(working_mutexes[0]);
-    // std::cout << "Thread " << id << " has B_len: " << B_len << std::endl;
-    // }
-    std::vector<char> B(B_ptr + (m/num_blocks)*(id/2), B_ptr + (m/num_blocks)*(id/2) + B_len); // Copy B part
+
     int col_k1 = info[id].first; // index of first special column (in group)
     int col_k2 = info[id].last; // index of last special column (in group)
     int row_k1 = info[id].top_row; // index of first row (in group)
@@ -238,7 +234,8 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
         // }
         int row_midk = ceil((row_k1 + row_k2)/2);   //index of middle row
         bool ishead = (2*col_k1 == id);
-
+        B_len += info[id].plus;
+        std::vector<char> B(B_ptr + (m/num_blocks)*(id/2), B_ptr + (m/num_blocks)*(id/2) + B_len); // Copy B part
         // Initialize curr and prev
         std::vector<cell> T1_curr(B_len + 1, INF);
         std::vector<cell> T2_curr(B_len + 1, INF);
@@ -721,9 +718,9 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             int r2 = max_opt.r_row + row_midk+1; // rows where we split the problem [get using next and prev]
             int t1 = max_opt.origin_type;
             int t2 = max_opt.r_type; // types where we split the problem
-            // if(iter==1){
+            // {
             //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
-            //     std::cout<< "Splitting Problem: " << "\n"
+            //     std::cout<< "Splitting Problem: " << id << "\n"
             //     << "r1: " << r1 <<"\n"
             //     << "row_k1: " << row_k1 <<"\n"
             //     << "max_opt.origin_row: " << max_opt.origin_row <<"\n"
@@ -738,7 +735,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             //     << std::endl;
             // }
             for (int thread_id = 2*col_k1; thread_id < 2*leftmost_col; thread_id++){
-                info[thread_id] = Info(col_k1, leftmost_col-1, row_k1, r1, s, t1,1);
+                info[thread_id] = Info(col_k1, leftmost_col-1, row_k1, r1, s, t1, 1);
             }
             for (int thread_id = 2*leftmost_col +2 ; thread_id < 2*col_k2 + 2; thread_id++){
                 info[thread_id] = Info(leftmost_col +1,col_k2, r2, row_k2, t2, e,0);
@@ -812,12 +809,13 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
             //     << "col_k2: " << col_k2 <<"\n"
             //     << "row_k1: " << row_k1 <<"\n"
             //     << "row_k2: " << row_k2 <<"\n"
+            //     << "overlap: " << info[id].plus <<"\n"
             //     << "s: " << s <<"\n"
-            //     << "3: " << e <<"\n"
+            //     << "e: " << e <<"\n"
             //     << std::endl;
             // }
-    B_len = 0;
-    if (col_k1 +1 == col_k2){B_len = m/num_blocks;}
+    B_len = info[id].plus;
+    if (col_k1 +1 == col_k2){B_len += m/num_blocks;}
     if (2*col_k2 == p-2){
         B_len += (m / num_blocks) + (m % num_blocks);
     } else {
@@ -827,7 +825,7 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
 
     std::vector<char> B2(B_ptr+start_idx, B_ptr +start_idx+ B_len); // Copy B part
 
-    int num_rows = (row_k2 - row_k1);
+    int num_rows = (row_k2 - row_k1) + info[id].plus;
     std::vector<char> A(A_ptr + row_k1, A_ptr + row_k1 + num_rows); // Copy A part
 
     extended_P sub_problem;
@@ -836,20 +834,20 @@ void thread_f(const char* A_ptr, const char* B_ptr, int p, int id, int n, int m,
     sub_problem.s = s;
     sub_problem.e = e;
 
-            //     {
-            //     std::lock_guard<std::mutex> lk(working_mutexes[0]);
-            //     std::cout<< "SUBPROBLEM INFO - THREAD: " << id << "\n"
-            //     << "A: " << std::string(A.begin(), A.end()) <<"\n"
-            //     << "B: " << std::string(B2.begin(), B2.end()) <<"\n"
-            //     << "s: " << s <<"\n"
-            //     << "e: " << e <<"\n"
-            //     << "row_k1: " << row_k1 <<"\n"
-            //     << "row_k2: " << row_k2 <<"\n"
-            //     << "B_len: " << B_len <<"\n"
-            //     << "Start_idx: " << start_idx <<"\n"
-            //     << std::endl;
-            // }
-    result = solve_subproblem(sub_problem, start_idx, row_k1);
+                {
+                std::lock_guard<std::mutex> lk(working_mutexes[0]);
+                std::cout<< "SUBPROBLEM INFO - THREAD: " << id << "\n"
+                << "A: " << std::string(A.begin(), A.end()) <<"\n"
+                << "B: " << std::string(B2.begin(), B2.end()) <<"\n"
+                << "s: " << s <<"\n"
+                << "e: " << e <<"\n"
+                << "row_k1: " << row_k1 <<"\n"
+                << "row_k2: " << row_k2 <<"\n"
+                << "B_len: " << B_len <<"\n"
+                << "Start_idx: " << start_idx <<"\n"
+                << std::endl;
+            }
+    result = solve_subproblem(sub_problem, start_idx, row_k1, info[id].plus);
     // std::cout << "DONE: " << id << std::endl;
             // {
             //  std::lock_guard<std::mutex> lk(working_mutexes[0]);
@@ -913,9 +911,9 @@ int main(int argc, char* argv[]) {
     int p = 12;//std::stoi(argv[3]);  // Convert string to int
     std::vector<char> A = readFastaSequence(folder + sequence1_filename);
     std::vector<char> B = readFastaSequence(folder+sequence2_filename);
-    // std::cout<< "INPUT SEQUENCES:"<<std::endl;
-    // std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
-    //           << "B: " << std::string(B.begin(), B.end()) << std::endl;
+    std::cout<< "INPUT SEQUENCES:"<<std::endl;
+    std::cout << "A: " << std::string(A.begin(), A.end()) << "\n"
+              << "B: " << std::string(B.begin(), B.end()) << std::endl;
     // for(p = 1; p < 24; p++){
     // auto start = std::chrono::high_resolution_clock::now();
     // run(A, B, p);
@@ -926,14 +924,24 @@ int main(int argc, char* argv[]) {
 
     // auto start = std::chrono::high_resolution_clock::now();
     run(A, B, 10);
-    run(A, B, 12);
+    // run(A, B, 12);
 
     // auto end = std::chrono::high_resolution_clock::now();
     // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
     // std::cout << "Execution time for " << p << " processors: " << duration.count() << " nanoseconds\n";
     return 0;
 }
-// MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFF-YTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN // Sequence A : 
-// MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYT-PKARREVEGPQVGALELAGGPGAG-----GLEGPPQKRGIVEQCCASVCSLYQLENYCN // Sequence B : 
-// MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN // Sequence A : 
-// MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYTPKARREVEGPQVGALELAGGPGAGGLEGPPQKRGIVEQCCASVCSLYQLENYCN // Sequence B : 
+
+/*
+
+Score: 169
+Length Sequence A : 110
+Length Sequence B : 110
+Sequence A : MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN
+Sequence B : MALWTRLRPLLALLALWPPPPARAFVNQHLCGSHLVEALYLVCGERGFFYTPKARREVEGPQVGALELAGGPGAG-----GLEGPPQKRGIVEQCCASVCSLYQLENYCN
+
+
+
+
+*/
+
