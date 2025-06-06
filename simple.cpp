@@ -304,13 +304,18 @@ result run(int p, str A, str B){
 }
 
 int main(){
-    int p = 10;
-    str A = readFastaSequence("sequences/insulin_homo.fasta");
-    str B = readFastaSequence("sequences/insulin_bovin.fasta");
+    auto start = std::chrono::high_resolution_clock::now();
+    int p = 6;
+    str A = readFastaSequence("sequences/homo_insulinlike.fasta");
+    str B = readFastaSequence("sequences/mouse_insulinlike.fasta");
     result Result = run(p, A, B);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
     std::cout << "concurrent computation of DP with " << p << " processors" << std::endl;
     std::cout << "Score of : " << Result.score << std::endl;
-    output_alignement(Result.al, A, B);
+    std::cout << "Elapsed time: " << duration.count() << " microseconds\n";
+    
+    //output_alignement(Result.al, A, B);
 }
 
