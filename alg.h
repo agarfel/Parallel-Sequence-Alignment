@@ -67,6 +67,12 @@ public:
         score = 0;
         al = {};
     }
+
+    result(int s, alignment a){
+        score = s;
+        al = a;
+    }
+    
 };
 
 
