@@ -1,4 +1,4 @@
-#include "alg.h"
+#include "simple.h"
 #include <algorithm>
 #include <initializer_list>
 #include <vector>
@@ -9,16 +9,6 @@
 #include <thread>
 #include <cstring>
 #include <chrono>
-
-class Entry {
-public: 
-
-    int value;
-    alignment al;
-
-    Entry() : value(0), al() {}
-
-};
 
 int f(char a, char b){
     if(a == b){return 2;} 
@@ -48,8 +38,8 @@ pair find_last(alignment al){
     }
 
     return mypair;
-
 }
+
 void output_alignement(alignment alignment, str A, str B){
     std::string al_A = "";
     std::string al_B = "";
@@ -82,17 +72,17 @@ void output_alignement(alignment alignment, str A, str B){
 
 /*
 Function called by each thread.
-    A_ptr : pointer to B (in global memory)
-    B_ptr : pointer to A (in global memory)
+    A_ptr : pointer to A (in global memory)
+    B_ptr : pointer to B (in global memory)
     p : number of threads
     id : number of this thread
     n : length of A
     m : lenght B
-    Working
+    Working : stage of each processor
     working_mutexes
-    update
-    sharingT
-    sharingOpt
+    update : conditional variable (updates to working)
+    sharingT : to share values of between processors when computing T
+    result : store final result
 */
 void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<int>& working,
     std::vector<std::mutex>& working_mutexes, std::condition_variable& update, std::vector<std::vector<Entry>>* sharingT,
@@ -222,7 +212,7 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
             }
         }
         // Share last value:
-        if (id != p-1){ // Not last row
+        if (id != p-1){ // Not last column
             {
                 std::unique_lock<std::mutex> lock(working_mutexes[id+1]);
 
@@ -271,7 +261,7 @@ void solve_subproblem_parallel(str& A, str& B_full, int p, int id, std::vector<i
 result run(int p, str A, str B){
     std::vector<std::thread> workers(p);
     std::condition_variable update; // notifies if there's a change to Working
-    std::vector<int> Working(p, 1); // vector of size p, Working[i] = 1 if thread i is working, 0 otherwise
+    std::vector<int> Working(p, 1);
     std::vector<std::mutex> working_mutexes(p);
     std::vector<std::vector<Entry>>* sharingT = new std::vector<std::vector<Entry>>(6, std::vector<Entry>(p));
 
@@ -304,33 +294,45 @@ result run(int p, str A, str B){
 }
 
 
+int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <sequence1.fasta> <sequence2.fasta> <p>\n";
+        return 1;
+    }
+    std::string folder = "sequences/";
 
-int main(){
-  
-    str A = readFastaSequence("sequences/homo_insulinlike.fasta");
-    str B = readFastaSequence("sequences/mouse_insulinlike.fasta");
+    std::string sequence1_filename = argv[1];
+    std::string sequence2_filename = argv[2];
+    int p = std::stoi(argv[3]);
+
+    str A = readFastaSequence(folder + sequence1_filename);
+    str B = readFastaSequence(folder+sequence2_filename);
+
+    result Result = run(p, A, B);
+    std::cout << "Score: " << Result.score << std::endl;  
+    output_alignement(Result.al, A, B);
 
     // std::cout << "concurrent computation of DP with " << p << " processors" << std::endl;
     // std::cout << "Score of : " << Result.score << std::endl;
     //output_alignement(Result.al, A, B);
 
-
-    std::ofstream csvFile("timings.csv");
-    csvFile << "threads,time_microseconds\n";
+    // Uncomment to Test:
+    // std::ofstream csvFile("timings.csv");
+    // csvFile << "threads,time_microseconds\n";
     
-    for (int p = 1; p <= 32; ++p) {
-        auto start = std::chrono::high_resolution_clock::now();
-        result Result = run(p, A, B);
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    // for (int p = 1; p <= 32; ++p) {
+    //     auto start = std::chrono::high_resolution_clock::now();
+    //     
+    //     auto end = std::chrono::high_resolution_clock::now();
+    //     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-        // Log result
-        std::cout << "p=" << p << ", time=" << duration.count() << " µs, score=" << Result.score << std::endl;
-        csvFile << p << "," << duration.count() << "\n";
-    }
+    //     // Log result
+    //     std::cout << "p=" << p << ", time=" << duration.count() << " µs, score=" << Result.score << std::endl;
+    //     csvFile << p << "," << duration.count() << "\n";
+    // }
 
-    csvFile.close();
-    std::cout << "Timing results written to timings.csv\n";
+    // csvFile.close();
+    // std::cout << "Timing results written to timings.csv\n";
     return 0;
 }
 

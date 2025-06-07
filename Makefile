@@ -1,10 +1,10 @@
-all: main simple
+all: complex simple
 
-main: main.cpp
-	g++ main.cpp -o main -fsanitize=address -g -O1
+complex: complex.cpp
+	g++ complex.cpp -o complex
 
 simple : simple.cpp
 	g++ simple.cpp -o simple
 
 clean:
-	rm -f main simple
+	rm -f complex simple

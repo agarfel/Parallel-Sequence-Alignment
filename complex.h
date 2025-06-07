@@ -9,14 +9,10 @@ typedef std::vector<char> str;
 typedef std::pair<int, int> pair;
 
 int INF = -100000;
-int SUP = std::numeric_limits<int>::max();
 
-const int gap_creation_penalty = 2; // h
-const int gap_penalty = 1;  // g
 const int match_score = 2;
-
-const int h = gap_creation_penalty;
-const int g = gap_penalty;
+const int h = 2; // Gap creation penalty
+const int g = 1; // Gap penalty
 
 struct extended_P {
     str A, B;   // Sequences A and B
@@ -127,8 +123,5 @@ public:
 Working values:
     1. Computing T: Read from global
     2. Computing T: Wrote to global
-    3. Done computing T
-    4. Done computing Opt
-    
-    X. Solving sub-problem
+    4. Done computing TRev / Opt
 */
