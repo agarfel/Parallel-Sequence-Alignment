@@ -303,19 +303,34 @@ result run(int p, str A, str B){
 
 }
 
+
+
 int main(){
-    auto start = std::chrono::high_resolution_clock::now();
-    int p = 6;
+  
     str A = readFastaSequence("sequences/homo_insulinlike.fasta");
     str B = readFastaSequence("sequences/mouse_insulinlike.fasta");
-    result Result = run(p, A, B);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    std::cout << "concurrent computation of DP with " << p << " processors" << std::endl;
-    std::cout << "Score of : " << Result.score << std::endl;
-    std::cout << "Elapsed time: " << duration.count() << " microseconds\n";
-    
+    // std::cout << "concurrent computation of DP with " << p << " processors" << std::endl;
+    // std::cout << "Score of : " << Result.score << std::endl;
     //output_alignement(Result.al, A, B);
+
+
+    std::ofstream csvFile("timings.csv");
+    csvFile << "threads,time_microseconds\n";
+    
+    for (int p = 1; p <= 32; ++p) {
+        auto start = std::chrono::high_resolution_clock::now();
+        result Result = run(p, A, B);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        // Log result
+        std::cout << "p=" << p << ", time=" << duration.count() << " µs, score=" << Result.score << std::endl;
+        csvFile << p << "," << duration.count() << "\n";
+    }
+
+    csvFile.close();
+    std::cout << "Timing results written to timings.csv\n";
+    return 0;
 }
 
